@@ -1,0 +1,1 @@
+export {getArguments} from './get-arguments'
