@@ -21,10 +21,9 @@
     "declaration": true,
     "noEmit": true,
 
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@internal/*": ["src/internal/*"]
+      "@/*": ["./src/*"],
+      "@internal/*": ["./src/internal/*"]
     }
   },
   "include": ["src", "cli", "tests", "tsup.config.ts", "vitest.config.ts"],

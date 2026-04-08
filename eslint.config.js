@@ -38,4 +38,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unnecessary-condition': 'off',
     },
   },
+
+  {
+    files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+  },
 );
