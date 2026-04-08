@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Readable } from 'node:stream';
-import { GitCommandError } from '../../errors.js';
+import { AbortError, GitCommandError } from '../../errors.js';
 
 export interface SpawnGitResult {
   stdout: Readable;
@@ -12,7 +12,17 @@ const GIT_ENV_OVERRIDES = {
   GIT_OPTIONAL_LOCKS: '0',
 };
 
-export function spawnGit(args: readonly string[], cwd: string): SpawnGitResult {
+const SIGKILL_GRACE_MS = 500;
+
+export function spawnGit(
+  args: readonly string[],
+  cwd: string,
+  signal?: AbortSignal,
+): SpawnGitResult {
+  if (signal?.aborted === true) {
+    throw new AbortError();
+  }
+
   const child: ChildProcess = spawn('git', [...args], {
     cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -32,8 +42,44 @@ export function spawnGit(args: readonly string[], cwd: string): SpawnGitResult {
   }
 
   const done = new Promise<void>((resolve, reject) => {
-    child.on('error', reject);
+    let aborted = false;
+    let killTimer: NodeJS.Timeout | undefined;
+
+    const onAbort = (): void => {
+      aborted = true;
+      child.kill('SIGTERM');
+      killTimer = setTimeout(() => {
+        if (!child.killed) {
+          child.kill('SIGKILL');
+        }
+      }, SIGKILL_GRACE_MS);
+      killTimer.unref();
+    };
+
+    if (signal !== undefined) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    const cleanup = (): void => {
+      if (signal !== undefined) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      if (killTimer !== undefined) {
+        clearTimeout(killTimer);
+      }
+    };
+
+    child.on('error', (err) => {
+      cleanup();
+      reject(err);
+    });
+
     child.on('close', (code) => {
+      cleanup();
+      if (aborted) {
+        reject(new AbortError());
+        return;
+      }
       if (code === 0) {
         resolve();
         return;
