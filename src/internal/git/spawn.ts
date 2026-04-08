@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Readable } from 'node:stream';
+import { GitCommandError } from '../../errors.js';
 
 export interface SpawnGitResult {
   stdout: Readable;
@@ -23,14 +24,22 @@ export function spawnGit(args: readonly string[], cwd: string): SpawnGitResult {
   }
   const stdout = child.stdout;
 
+  const stderrChunks: Buffer[] = [];
+  if (child.stderr !== null) {
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrChunks.push(chunk);
+    });
+  }
+
   const done = new Promise<void>((resolve, reject) => {
     child.on('error', reject);
     child.on('close', (code) => {
       if (code === 0) {
         resolve();
-      } else {
-        reject(new Error(`git ${args.join(' ')} exited with code ${String(code)}`));
+        return;
       }
+      const stderr = Buffer.concat(stderrChunks).toString('utf8');
+      reject(new GitCommandError(`git ${args.join(' ')}`, cwd, stderr, code ?? -1));
     });
   });
 
