@@ -1,17 +1,11 @@
 import { createInterface } from 'node:readline';
 
-export interface LogFileChange {
-  path: string;
-  added: number;
-  deleted: number;
-}
-
 export interface LogCommit {
   sha: string;
   authorName: string;
   authorMail: string;
   authorTime: number;
-  files: LogFileChange[];
+  files: { path: string; added: number; deleted: number }[];
 }
 
 const NUMSTAT_REGEX = /^(\d+|-)\t(\d+|-)\t(.+)$/;
