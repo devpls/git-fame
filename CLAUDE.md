@@ -106,6 +106,34 @@ Define helpers before the functions that use them. Files read top-down from
 dependencies up to main exports. Do not rely on function declaration
 hoisting.
 
+### Fast exit over nested `if`
+
+Prefer guard clauses and early exits. Check invalid states first, throw or
+return or `continue`, then write the happy path unindented.
+
+```ts
+// ✅ happy path at the left margin
+if (state === null) {
+  throw new Error('no state');
+}
+yield buildResult(state);
+
+// ❌ nested — the real work drifts right
+if (state !== null) {
+  if (state.ready) {
+    yield buildResult(state);
+  }
+}
+```
+
+When a loop body would need multiple levels of nesting to handle different
+branches, extract each branch to an arrow helper. Each helper throws or
+returns early; the loop becomes a flat sequence of
+`if (condition) { helper(...); continue; }` statements.
+
+Do not use `else` after `return` or `throw`. If the previous block exits,
+the following code is already the implicit else — no extra nesting needed.
+
 ### Class methods
 
 Use regular method syntax on the prototype, not arrow fields. Arrow fields

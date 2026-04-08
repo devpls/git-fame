@@ -18,10 +18,54 @@ type PartialBlameLine = PartialBy<
 const HEADER_REGEX = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/;
 
 const stripAngleBrackets = (mail: string): string => {
-  if (mail.startsWith('<') && mail.endsWith('>')) {
-    return mail.slice(1, -1);
+  if (!mail.startsWith('<') || !mail.endsWith('>')) {
+    return mail;
   }
-  return mail;
+  return mail.slice(1, -1);
+};
+
+const finaliseContentLine = (state: PartialBlameLine | null, raw: string): BlameLine => {
+  if (
+    state?.authorName === undefined ||
+    state.authorMail === undefined ||
+    state.authorTime === undefined
+  ) {
+    throw new Error('parseBlamePorcelain: content line before complete header block');
+  }
+  return {
+    sha: state.sha,
+    authorName: state.authorName,
+    authorMail: state.authorMail,
+    authorTime: state.authorTime,
+    line: raw.slice(1),
+    isBoundary: state.isBoundary,
+  };
+};
+
+const beginNewEntry = (state: PartialBlameLine | null, sha: string): PartialBlameLine => {
+  if (state !== null) {
+    throw new Error('parseBlamePorcelain: header line arrived before previous entry finished');
+  }
+  return { sha, isBoundary: false };
+};
+
+const applyMetadataLine = (state: PartialBlameLine, raw: string): void => {
+  if (raw.startsWith('author ')) {
+    state.authorName = raw.slice('author '.length);
+    return;
+  }
+  if (raw.startsWith('author-mail ')) {
+    state.authorMail = stripAngleBrackets(raw.slice('author-mail '.length));
+    return;
+  }
+  if (raw.startsWith('author-time ')) {
+    state.authorTime = Number(raw.slice('author-time '.length));
+    return;
+  }
+  if (raw === 'boundary') {
+    state.isBoundary = true;
+  }
+  // committer-*, author-tz, summary, filename, previous are intentionally ignored.
 };
 
 export async function* parseBlamePorcelain(
@@ -32,32 +76,14 @@ export async function* parseBlamePorcelain(
 
   for await (const raw of rl) {
     if (raw.startsWith('\t')) {
-      if (
-        state?.authorName === undefined ||
-        state.authorMail === undefined ||
-        state.authorTime === undefined
-      ) {
-        throw new Error('parseBlamePorcelain: content line before complete header block');
-      }
-      yield {
-        sha: state.sha,
-        authorName: state.authorName,
-        authorMail: state.authorMail,
-        authorTime: state.authorTime,
-        line: raw.slice(1),
-        isBoundary: state.isBoundary,
-      };
+      yield finaliseContentLine(state, raw);
       state = null;
       continue;
     }
 
     const headerMatch = HEADER_REGEX.exec(raw);
     if (headerMatch !== null) {
-      if (state !== null) {
-        throw new Error('parseBlamePorcelain: header line arrived before previous entry finished');
-      }
-      const sha = headerMatch[1] ?? '';
-      state = { sha, isBoundary: false };
+      state = beginNewEntry(state, headerMatch[1] ?? '');
       continue;
     }
 
@@ -65,16 +91,7 @@ export async function* parseBlamePorcelain(
       throw new Error(`parseBlamePorcelain: unexpected line outside of a block: ${raw}`);
     }
 
-    if (raw.startsWith('author ')) {
-      state.authorName = raw.slice('author '.length);
-    } else if (raw.startsWith('author-mail ')) {
-      state.authorMail = stripAngleBrackets(raw.slice('author-mail '.length));
-    } else if (raw.startsWith('author-time ')) {
-      state.authorTime = Number(raw.slice('author-time '.length));
-    } else if (raw === 'boundary') {
-      state.isBoundary = true;
-    }
-    // committer-*, author-tz, summary, filename, previous are intentionally ignored.
+    applyMetadataLine(state, raw);
   }
 
   if (state !== null) {
