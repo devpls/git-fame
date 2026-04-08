@@ -8,10 +8,12 @@
   "engines": {
     "node": ">=20"
   },
+  "bin": "./dist/cli/bin.js",
   "zshy": {
     "exports": {
       ".": "./src/index.ts"
     },
+    "bin": "./cli/bin.ts",
     "cjs": false
   },
   "files": [
@@ -57,14 +59,14 @@
     "zshy": "^0.7.0"
   },
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
     }
   },
-  "module": "./dist/index.js",
+  "module": "./dist/src/index.js",
   "dependencies": {
     "cli-table3": "^0.6.5",
     "p-limit": "^7.3.0"
