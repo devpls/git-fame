@@ -19,9 +19,7 @@
 
     "resolveJsonModule": true,
     "declaration": true,
-    "noEmit": true,
-
-    "ignoreDeprecations": "6.0"
+    "noEmit": true
   },
   "include": ["src", "cli", "tests", "tsup.config.ts", "vitest.config.ts", "eslint.config.ts"],
   "exclude": ["dist", "node_modules"]
