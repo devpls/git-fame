@@ -33,7 +33,7 @@ export default defineConfig([
   },
 
   {
-    files: ['tests/**/*.ts'],
+    files: ['**/*.test.ts', 'tests/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unnecessary-condition': 'off',

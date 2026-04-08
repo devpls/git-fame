@@ -1,8 +1,8 @@
-import { describe, expect, it, afterEach } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { buildRepo, cleanupRepo } from './build-repo.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildRepo } from './build-repo.js';
 
 describe('buildRepo', () => {
   const created: string[] = [];
@@ -91,12 +91,5 @@ describe('buildRepo', () => {
         },
       ]),
     ).toThrow(/author/i);
-  });
-
-  it('cleanupRepo removes the directory', () => {
-    const dir = buildRepo([]);
-    expect(existsSync(dir)).toBe(true);
-    cleanupRepo(dir);
-    expect(existsSync(dir)).toBe(false);
   });
 });

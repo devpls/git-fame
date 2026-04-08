@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
 import { rmSync } from 'node:fs';
-import { listTrackedFiles } from '../../../src/internal/git/ls-files.js';
-import { buildRepo } from '../../helpers/build-repo.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildRepo } from '../../../tests/helpers/build-repo.js';
+import { listTrackedFiles } from './list-tracked-files.js';
 
 describe('listTrackedFiles', () => {
   const created: string[] = [];
@@ -17,8 +17,6 @@ describe('listTrackedFiles', () => {
   it('returns an empty array for an empty repo', async () => {
     const dir = buildRepo([]);
     created.push(dir);
-    // buildRepo leaves an orphan branch with no commits if script is empty.
-    // ls-files on such a repo returns nothing — valid input, empty output.
     const files = await listTrackedFiles(dir);
     expect(files).toEqual([]);
   });

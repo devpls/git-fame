@@ -1,8 +1,8 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 export interface CommitScript {
   author: string; // 'Name <email@host>'
@@ -14,7 +14,16 @@ export interface CommitScript {
 
 export type RepoScript = CommitScript[];
 
-export function buildRepo(script: RepoScript): string {
+const runGit = (args: string[], cwd: string, env: NodeJS.ProcessEnv): void => {
+  const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(
+      `git ${args.join(' ')} failed (exit ${String(result.status)}): ${result.stderr}`,
+    );
+  }
+};
+
+export const buildRepo = (script: RepoScript): string => {
   const dir = mkdtempSync(join(tmpdir(), `node-fame-test-${randomUUID()}-`));
 
   runGit(['init', '--initial-branch=main'], dir, process.env);
@@ -59,17 +68,4 @@ export function buildRepo(script: RepoScript): string {
   }
 
   return dir;
-}
-
-export function cleanupRepo(dir: string): void {
-  rmSync(dir, { recursive: true, force: true });
-}
-
-function runGit(args: string[], cwd: string, env: NodeJS.ProcessEnv): void {
-  const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
-  if (result.status !== 0) {
-    throw new Error(
-      `git ${args.join(' ')} failed (exit ${String(result.status)}): ${result.stderr}`,
-    );
-  }
-}
+};

@@ -1,22 +1,15 @@
-import { spawnGit } from './spawn.js';
-import { GitNotInstalledError } from '../../errors.js';
+import { GitNotInstalledError } from '../../errors/git-not-installed.error.js';
+import { collectStream } from './collect-stream.js';
+import { spawnGit } from './spawn-git.js';
 
 const MIN_GIT_MAJOR = 2;
 const MIN_GIT_MINOR = 30;
 
-async function collect(stream: NodeJS.ReadableStream): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks).toString('utf8');
-}
-
-export async function assertGitInstalled(): Promise<void> {
+export const assertGitInstalled = async (): Promise<void> => {
   let output: string;
   try {
     const result = spawnGit(['--version'], process.cwd());
-    const [text] = await Promise.all([collect(result.stdout), result.done]);
+    const [text] = await Promise.all([collectStream(result.stdout), result.done]);
     output = text;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -38,4 +31,4 @@ export async function assertGitInstalled(): Promise<void> {
       `git ${String(major)}.${String(minor)} is too old; need ${String(MIN_GIT_MAJOR)}.${String(MIN_GIT_MINOR)}+`,
     );
   }
-}
+};

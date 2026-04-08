@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  version,
-  NodeFameError,
-  NotAGitRepoError,
-  GitNotInstalledError,
-  InvalidRevError,
+  AbortError,
   ConflictingOptionsError,
   GitCommandError,
-  AbortError,
-} from '../../src/index.js';
+  GitNotInstalledError,
+  InvalidRevError,
+  NodeFameError,
+  NotAGitRepoError,
+  version,
+} from './index.js';
 
 describe('node-fame package entry', () => {
   it('exports a version string', () => {

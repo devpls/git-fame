@@ -1,11 +1,11 @@
 export const version = '0.1.0';
 
 export {
-  NodeFameError,
-  NotAGitRepoError,
-  GitNotInstalledError,
-  InvalidRevError,
+  AbortError,
   ConflictingOptionsError,
   GitCommandError,
-  AbortError,
-} from './errors.js';
+  GitNotInstalledError,
+  InvalidRevError,
+  NodeFameError,
+  NotAGitRepoError,
+} from './errors/index.js';

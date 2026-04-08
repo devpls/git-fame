@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Readable } from 'node:stream';
-import { AbortError, GitCommandError } from '../../errors.js';
+import { AbortError } from '../../errors/abort.error.js';
+import { GitCommandError } from '../../errors/git-command.error.js';
 
 export interface SpawnGitResult {
   stdout: Readable;
@@ -14,11 +15,11 @@ const GIT_ENV_OVERRIDES = {
 
 const SIGKILL_GRACE_MS = 500;
 
-export function spawnGit(
+export const spawnGit = (
   args: readonly string[],
   cwd: string,
   signal?: AbortSignal,
-): SpawnGitResult {
+): SpawnGitResult => {
   if (signal?.aborted === true) {
     throw new AbortError();
   }
@@ -90,4 +91,4 @@ export function spawnGit(
   });
 
   return { stdout, done };
-}
+};
