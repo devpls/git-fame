@@ -202,12 +202,26 @@ and local.
 
 ## File structure
 
-### One public export per file
+### One function or class per file
 
-Every source file exports exactly **one** function or class. Colocate types
-used in that one function's signature in the same file. Do not bundle
-"related" public functions into one file — related functions share a folder
-with a barrel, not a file.
+Every source file contains exactly **one** function or class at the top
+level — regardless of whether it is exported. Private helper functions and
+classes each live in their own file. Types, interfaces, and constants do
+not count against the limit; they colocate with the single function or
+class that needs them.
+
+**Consequences:**
+
+- A module that has a main function plus several private helper functions
+  **must** use the folder-pattern: the main function stays in the folder's
+  entry file, helpers move into a `helpers/` subfolder with one helper per
+  file.
+- Constants and regexes (`const FOO_REGEX = ...`) colocate with the single
+  function that uses them.
+- Types and interfaces used only inside one file can colocate; types used
+  across several files in the same folder can move into a `types/`
+  subfolder with one type per file (use the `.type.ts` suffix).
+- "Related" public functions share a folder with a barrel, not a file.
 
 ### Angular-style naming
 
@@ -302,6 +316,17 @@ tests/
 
 Test helpers that have their own tests (meta-tests) follow the same
 colocation rule within `tests/helpers/`.
+
+### Type-only files do not require tests
+
+Files with the `.type.ts` suffix that contain nothing but type or interface
+declarations are exempt from the colocated-test rule. They have no runtime
+behaviour to exercise — `tsc --noEmit` already validates their correctness
+by compile-checking. **Exception:** type utilities with non-trivial type
+logic (conditional types, mapped types, infer, etc.) SHOULD have a
+`.type.test.ts` that uses `expectTypeOf` to lock in the behaviour.
+Utilities like `PartialBy<T, K>` have tests; plain data interfaces like
+`BlameLine` do not.
 
 ## Testing conventions
 

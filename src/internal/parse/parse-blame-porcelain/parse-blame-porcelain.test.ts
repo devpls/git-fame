@@ -1,10 +1,11 @@
 import { rmSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildBlameFixture } from '../../../tests/helpers/build-blame-fixture.js';
-import { buildRepo } from '../../../tests/helpers/build-repo.js';
-import { spawnGit } from '../git/spawn-git.js';
-import { parseBlamePorcelain, type BlameLine } from './parse-blame-porcelain.js';
+import { buildBlameFixture } from '../../../../tests/helpers/build-blame-fixture.js';
+import { buildRepo } from '../../../../tests/helpers/build-repo.js';
+import { spawnGit } from '../../git/spawn-git.js';
+import { parseBlamePorcelain } from './parse-blame-porcelain.js';
+import type { BlameLine } from './types/blame-line.type.js';
 
 const streamOf = (text: string): NodeJS.ReadableStream => Readable.from([text]);
 

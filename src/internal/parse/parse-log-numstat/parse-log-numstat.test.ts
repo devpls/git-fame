@@ -1,7 +1,8 @@
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import { buildLogFixture } from '../../../tests/helpers/build-log-fixture.js';
-import { parseLogNumstat, type LogCommit } from './parse-log-numstat.js';
+import { buildLogFixture } from '../../../../tests/helpers/build-log-fixture.js';
+import { parseLogNumstat } from './parse-log-numstat.js';
+import type { LogCommit } from './types/log-commit.type.js';
 
 const streamOf = (text: string): NodeJS.ReadableStream => Readable.from([text]);
 
