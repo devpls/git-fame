@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { version } from '../../src/index';
+import {
+  version,
+  NodeFameError,
+  NotAGitRepoError,
+  GitNotInstalledError,
+  InvalidRevError,
+  ConflictingOptionsError,
+  GitCommandError,
+  AbortError,
+} from '../../src/index.js';
 
 describe('node-fame package entry', () => {
   it('exports a version string', () => {
@@ -8,5 +17,15 @@ describe('node-fame package entry', () => {
 
   it('version follows semver format (major.minor.patch)', () => {
     expect(version).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it('re-exports all error classes', () => {
+    expect(NodeFameError).toBeDefined();
+    expect(NotAGitRepoError).toBeDefined();
+    expect(GitNotInstalledError).toBeDefined();
+    expect(InvalidRevError).toBeDefined();
+    expect(ConflictingOptionsError).toBeDefined();
+    expect(GitCommandError).toBeDefined();
+    expect(AbortError).toBeDefined();
   });
 });
