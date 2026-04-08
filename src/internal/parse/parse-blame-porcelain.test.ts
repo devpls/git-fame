@@ -1,6 +1,9 @@
+import { rmSync } from 'node:fs';
 import { Readable } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { buildBlameFixture } from '../../../tests/helpers/build-blame-fixture.js';
+import { buildRepo } from '../../../tests/helpers/build-repo.js';
+import { spawnGit } from '../git/spawn-git.js';
 import { parseBlamePorcelain, type BlameLine } from './parse-blame-porcelain.js';
 
 const streamOf = (text: string): NodeJS.ReadableStream => Readable.from([text]);
@@ -14,6 +17,16 @@ const collect = async (gen: AsyncGenerator<BlameLine>): Promise<BlameLine[]> => 
 };
 
 describe('parseBlamePorcelain', () => {
+  const createdRepos: string[] = [];
+  afterEach(() => {
+    while (createdRepos.length > 0) {
+      const dir = createdRepos.pop();
+      if (dir !== undefined) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
   it('parses a single content line with full header block', async () => {
     const fixture = buildBlameFixture([
       {
@@ -230,5 +243,38 @@ describe('parseBlamePorcelain', () => {
     await expect(collect(parseBlamePorcelain(streamOf(bad)))).rejects.toThrow(
       /header line arrived before previous entry finished/,
     );
+  });
+
+  it('parses real git blame --line-porcelain output for a two-author file', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <alice@example.com>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'mixed.txt': 'alice one\nalice two\nalice three\n' },
+      },
+      {
+        author: 'Bob <bob@example.com>',
+        date: '2024-01-02T00:00:00Z',
+        files: { 'mixed.txt': 'alice one\nBOB EDIT\nalice three\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const result = spawnGit(['blame', '--line-porcelain', 'HEAD', '--', 'mixed.txt'], dir);
+    const lines: BlameLine[] = [];
+    const consume = async (): Promise<void> => {
+      for await (const line of parseBlamePorcelain(result.stdout)) {
+        lines.push(line);
+      }
+    };
+    await Promise.all([consume(), result.done]);
+
+    expect(lines).toHaveLength(3);
+    expect(lines[0]?.authorName).toBe('Alice');
+    expect(lines[0]?.line).toBe('alice one');
+    expect(lines[1]?.authorName).toBe('Bob');
+    expect(lines[1]?.line).toBe('BOB EDIT');
+    expect(lines[2]?.authorName).toBe('Alice');
+    expect(lines[2]?.line).toBe('alice three');
   });
 });

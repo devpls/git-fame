@@ -1,4 +1,5 @@
 import { createInterface } from 'node:readline';
+import type { PartialBy } from '../types/partial-by.type.js';
 
 export interface BlameLine {
   sha: string;
@@ -9,13 +10,10 @@ export interface BlameLine {
   isBoundary: boolean;
 }
 
-interface PartialBlameLine {
-  sha: string;
-  authorName?: string;
-  authorMail?: string;
-  authorTime?: number;
-  isBoundary: boolean;
-}
+type PartialBlameLine = PartialBy<
+  Omit<BlameLine, 'line'>,
+  'authorName' | 'authorMail' | 'authorTime'
+>;
 
 const HEADER_REGEX = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/;
 
