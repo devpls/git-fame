@@ -21,11 +21,8 @@
     "declaration": true,
     "noEmit": true,
 
-    "paths": {
-      "@/*": ["./src/*"],
-      "@internal/*": ["./src/internal/*"]
-    }
+    "ignoreDeprecations": "6.0"
   },
-  "include": ["src", "cli", "tests", "tsup.config.ts", "vitest.config.ts"],
+  "include": ["src", "cli", "tests", "tsup.config.ts", "vitest.config.ts", "eslint.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

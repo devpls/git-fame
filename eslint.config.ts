@@ -1,6 +1,7 @@
+import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default defineConfig([
   { ignores: ['dist', 'coverage', 'node_modules'] },
 
   ...tseslint.configs.strictTypeChecked,
@@ -38,9 +39,4 @@ export default tseslint.config(
       '@typescript-eslint/no-unnecessary-condition': 'off',
     },
   },
-
-  {
-    files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
-    ...tseslint.configs.disableTypeChecked,
-  },
-);
+]);
