@@ -1,62 +1,58 @@
 {
   "name": "node-fame",
-  "private": true,
-  "version": "0.0.0",
-  "main": "./dist/node-fame.umd.cjs",
-  "module": "./dist/node-fame.js",
+  "version": "0.1.0",
+  "description": "Fast, accurate git contribution stats — lines, commits, files per author.",
+  "license": "MIT",
+  "author": "Mykhailo Kalashnikov",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "node-fame": "./dist/cli/bin.cjs"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": {
         "types": "./dist/index.d.ts",
-        "default": "./dist/node-fame.js"
+        "default": "./dist/index.js"
       },
       "require": {
         "types": "./dist/index.d.cts",
-        "default": "./dist/node-fame.umd.cjs"
+        "default": "./dist/index.cjs"
       }
     }
   },
-  "publishConfig": {
-    "access": "public",
-    "tag": "latest"
-  },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "dev": "webpack --watch",
-    "build": "webpack build",
-    "lint": "tsc",
+    "lint": "eslint . && tsc --noEmit",
+    "lint:fix": "eslint . --fix",
     "test": "vitest",
+    "test:run": "vitest run",
     "coverage": "vitest run --coverage",
-    "prettier": "prettier --write ."
+    "format": "prettier --write .",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepare": "husky",
+    "prepublishOnly": "npm run lint && npm run test:run && npm run build"
   },
-  "dependencies": {
-    "@swc/helpers": "^0.5.6",
-    "cli-progress": "^3.12.0",
-    "cli-table3": "^0.6.3",
-    "commander": "^12.0.0",
-    "ora": "^8.0.1",
-    "simple-git": "^3.22.0",
-    "winston": "^3.12.0"
-  },
-  "devDependencies": {
-    "@commander-js/extra-typings": "^12.0.1",
-    "@swc/cli": "^0.3.10",
-    "@swc/core": "^1.4.7",
-    "@types/cli-progress": "^3.11.5",
-    "@types/commander": "^2.12.2",
-    "@types/node": "^20.11.26",
-    "prettier": "^3.2.5",
-    "rollup-plugin-node-externals": "^7.0.1",
-    "swc-loader": "^0.2.6",
-    "ts-node": "^10.9.2",
-    "tsconfig-paths-webpack-plugin": "^4.1.0",
-    "typescript": "^5.2.2",
-    "webpack": "^5.90.3",
-    "webpack-cli": "^5.1.4",
-    "webpack-merge": "^5.10.0"
+  "lint-staged": {
+    "*.{ts,js,cjs,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }
