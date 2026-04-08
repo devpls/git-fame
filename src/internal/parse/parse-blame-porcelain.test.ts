@@ -86,4 +86,149 @@ describe('parseBlamePorcelain', () => {
     expect(lines.map((l) => l.line)).toEqual(['line one', 'line two', 'line three']);
     expect(lines.every((l) => l.authorName === 'Alice')).toBe(true);
   });
+
+  it('sets isBoundary to true when the boundary marker is present', async () => {
+    const fixture = buildBlameFixture([
+      {
+        sha: 'ccc0000000000000000000000000000000000000',
+        origLine: 1,
+        finalLine: 1,
+        groupCount: 1,
+        authorName: 'Alice',
+        authorMail: 'alice@example.com',
+        authorTime: 1704067200,
+        summary: 'Oldest commit',
+        boundary: true,
+        filename: 'a.txt',
+        content: 'the first line ever',
+      },
+    ]);
+
+    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.isBoundary).toBe(true);
+  });
+
+  it('tracks distinct authors across consecutive entries', async () => {
+    const fixture = buildBlameFixture([
+      {
+        sha: 'aaa0000000000000000000000000000000000000',
+        origLine: 1,
+        finalLine: 1,
+        groupCount: 1,
+        authorName: 'Alice',
+        authorMail: 'alice@example.com',
+        authorTime: 1704067200,
+        summary: 'first',
+        filename: 'a.txt',
+        content: 'written by alice',
+      },
+      {
+        sha: 'bbb0000000000000000000000000000000000000',
+        origLine: 2,
+        finalLine: 2,
+        groupCount: 1,
+        authorName: 'Bob',
+        authorMail: 'bob@example.com',
+        authorTime: 1704153600,
+        summary: 'second',
+        filename: 'a.txt',
+        content: 'written by bob',
+      },
+    ]);
+
+    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]?.authorName).toBe('Alice');
+    expect(lines[1]?.authorName).toBe('Bob');
+    expect(lines[0]?.line).toBe('written by alice');
+    expect(lines[1]?.line).toBe('written by bob');
+  });
+
+  it('handles non-ASCII author names, emails, and content', async () => {
+    const fixture = buildBlameFixture([
+      {
+        sha: 'a000000000000000000000000000000000000000',
+        origLine: 1,
+        finalLine: 1,
+        groupCount: 1,
+        authorName: 'Михаил',
+        authorMail: 'михаил@example.com',
+        authorTime: 1704067200,
+        summary: 'commit',
+        filename: 'файл.txt',
+        content: 'строка с юникодом',
+      },
+    ]);
+
+    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+
+    expect(lines[0]).toStrictEqual({
+      sha: 'a000000000000000000000000000000000000000',
+      authorName: 'Михаил',
+      authorMail: 'михаил@example.com',
+      authorTime: 1704067200,
+      line: 'строка с юникодом',
+      isBoundary: false,
+    });
+  });
+
+  it('yields nothing for an empty stream', async () => {
+    const lines = await collect(parseBlamePorcelain(streamOf('')));
+    expect(lines).toEqual([]);
+  });
+
+  it('parses CRLF line endings as if they were LF', async () => {
+    const fixture = buildBlameFixture([
+      {
+        sha: 'a000000000000000000000000000000000000000',
+        origLine: 1,
+        finalLine: 1,
+        groupCount: 1,
+        authorName: 'Alice',
+        authorMail: 'alice@example.com',
+        authorTime: 1704067200,
+        summary: 'commit',
+        filename: 'a.txt',
+        content: 'hello',
+      },
+    ]);
+    const crlfFixture = fixture.replace(/\n/g, '\r\n');
+
+    const lines = await collect(parseBlamePorcelain(streamOf(crlfFixture)));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.line).toBe('hello');
+  });
+
+  it('throws when a content line arrives without a complete header block', async () => {
+    const malformed = '\tjust content, no header\n';
+    await expect(collect(parseBlamePorcelain(streamOf(malformed)))).rejects.toThrow(
+      /content line before complete header/,
+    );
+  });
+
+  it('throws on unexpected end of stream mid-block', async () => {
+    const truncated =
+      'a000000000000000000000000000000000000000 1 1 1\n' +
+      'author Alice\n' +
+      'author-mail <alice@example.com>\n';
+    await expect(collect(parseBlamePorcelain(streamOf(truncated)))).rejects.toThrow(
+      /unexpected end of stream/,
+    );
+  });
+
+  it('throws when a header line arrives before the previous entry finished', async () => {
+    const bad =
+      'a000000000000000000000000000000000000000 1 1 1\n' +
+      'author Alice\n' +
+      'author-mail <alice@example.com>\n' +
+      'author-time 1704067200\n' +
+      'b000000000000000000000000000000000000000 2 2\n';
+    await expect(collect(parseBlamePorcelain(streamOf(bad)))).rejects.toThrow(
+      /header line arrived before previous entry finished/,
+    );
+  });
 });
