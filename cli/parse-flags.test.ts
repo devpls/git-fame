@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
+import { afterEach, describe, expect, it } from 'vitest';
 import { parseFlags } from './parse-flags.js';
 
 const base = ['node', 'node-fame'];
@@ -103,5 +107,48 @@ describe('parseFlags', () => {
     const result = parseFlags([...base, '--split-submodules']);
     expect(result.splitSubmodules).toBe(true);
     expect(result.options.submodules).toBe(true);
+  });
+
+  describe('config file integration', () => {
+    const created: string[] = [];
+
+    afterEach(() => {
+      for (const dir of created.splice(0)) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+        } catch {
+          // best-effort cleanup
+        }
+      }
+    });
+
+    it('loads .node-famerc config values', () => {
+      const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
+      created.push(dir);
+      writeFileSync(
+        join(dir, '.node-famerc'),
+        JSON.stringify({ format: 'json', includeGlobs: ['**/*.ts'], concurrency: 4 }),
+        'utf8',
+      );
+
+      const result = parseFlags(['node', 'cli', dir]);
+      expect(result.format).toBe('json');
+      expect(result.options.includeGlobs).toEqual(['**/*.ts']);
+      expect(result.options.concurrency).toBe(4);
+    });
+
+    it('CLI flags override .node-famerc', () => {
+      const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
+      created.push(dir);
+      writeFileSync(
+        join(dir, '.node-famerc'),
+        JSON.stringify({ format: 'json', concurrency: 4 }),
+        'utf8',
+      );
+
+      const result = parseFlags(['node', 'cli', '--format', 'csv', '--concurrency', '8', dir]);
+      expect(result.format).toBe('csv');
+      expect(result.options.concurrency).toBe(8);
+    });
   });
 });

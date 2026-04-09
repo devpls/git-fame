@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import type { AnalyzeOptions } from '../src/types/analyze-options.type.js';
 import type { RenderOptions, SortableColumn } from '../src/render/index.js';
+import { loadConfig } from '../src/internal/config/load-config.js';
 
 export interface ParsedFlags {
   options: AnalyzeOptions;
@@ -47,70 +48,115 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   const opts = program.opts();
   const path = program.args[0] ?? process.cwd();
 
+  const config = loadConfig(path);
+
   const include: AnalyzeOptions['include'] = {
-    whitespace: (opts.includeWhitespace as boolean | undefined) ?? false,
-    binary: (opts.includeBinary as boolean | undefined) ?? false,
-    generated: (opts.includeGenerated as boolean | undefined) ?? false,
+    whitespace:
+      (opts.includeWhitespace as boolean | undefined) ?? config.includeWhitespace ?? false,
+    binary: (opts.includeBinary as boolean | undefined) ?? config.includeBinary ?? false,
+    generated: (opts.includeGenerated as boolean | undefined) ?? config.includeGenerated ?? false,
   };
-  if ((opts.excludeMinified as boolean | undefined) === true) {
+  if (
+    (opts.excludeMinified as boolean | undefined) === true ||
+    (config.excludeMinified === true && (opts.excludeMinified as boolean | undefined) === undefined)
+  ) {
     include.minified = false;
   }
+
+  const followRenamesSource = program.getOptionValueSource('followRenames');
+  const mailmapSource = program.getOptionValueSource('mailmap');
 
   const analyzeOptions: AnalyzeOptions = {
     path,
     include,
     options: {
-      followRenames: opts.followRenames as boolean,
-      applyMailmap: opts.mailmap as boolean,
+      followRenames:
+        followRenamesSource === 'cli'
+          ? (opts.followRenames as boolean)
+          : (config.followRenames ?? true),
+      applyMailmap: mailmapSource === 'cli' ? (opts.mailmap as boolean) : (config.mailmap ?? true),
     },
   };
-  if ((opts.includeGlobs as string[] | undefined) !== undefined) {
-    analyzeOptions.includeGlobs = opts.includeGlobs as string[];
+
+  const cliGlobs = opts.includeGlobs as string[] | undefined;
+  if (cliGlobs !== undefined) {
+    analyzeOptions.includeGlobs = cliGlobs;
+  } else if (config.includeGlobs !== undefined) {
+    analyzeOptions.includeGlobs = config.includeGlobs;
   }
-  if ((opts.excludeGlobs as string[] | undefined) !== undefined) {
-    analyzeOptions.excludeGlobs = opts.excludeGlobs as string[];
+
+  const cliExclude = opts.excludeGlobs as string[] | undefined;
+  if (cliExclude !== undefined) {
+    analyzeOptions.excludeGlobs = cliExclude;
+  } else if (config.excludeGlobs !== undefined) {
+    analyzeOptions.excludeGlobs = config.excludeGlobs;
   }
+
   if ((opts.rev as string | undefined) !== undefined) {
     analyzeOptions.rev = opts.rev as string;
+  } else if (config.rev !== undefined) {
+    analyzeOptions.rev = config.rev;
   }
-  if (
-    (opts.from as string | undefined) !== undefined &&
-    (opts.to as string | undefined) !== undefined
-  ) {
-    analyzeOptions.range = { from: opts.from as string, to: opts.to as string };
+
+  const cliFrom = opts.from as string | undefined;
+  const cliTo = opts.to as string | undefined;
+  if (cliFrom !== undefined && cliTo !== undefined) {
+    analyzeOptions.range = { from: cliFrom, to: cliTo };
+  } else if (config.from !== undefined && config.to !== undefined) {
+    analyzeOptions.range = { from: config.from, to: config.to };
   }
+
   if ((opts.since as string | undefined) !== undefined) {
     analyzeOptions.since = new Date(opts.since as string);
+  } else if (config.since !== undefined) {
+    analyzeOptions.since = new Date(config.since);
   }
+
   if ((opts.until as string | undefined) !== undefined) {
     analyzeOptions.until = new Date(opts.until as string);
+  } else if (config.until !== undefined) {
+    analyzeOptions.until = new Date(config.until);
   }
 
-  const submodules = (opts.submodules as boolean | undefined) ?? false;
-  const splitSubmodules = (opts.splitSubmodules as boolean | undefined) ?? false;
-  const recursive = (opts.recursive as boolean | undefined) ?? false;
-
-  if (
-    (opts.concurrency as number | undefined) !== undefined &&
-    !isNaN(opts.concurrency as number)
-  ) {
-    analyzeOptions.concurrency = opts.concurrency as number;
+  const cliConcurrency = opts.concurrency as number | undefined;
+  if (cliConcurrency !== undefined && !isNaN(cliConcurrency)) {
+    analyzeOptions.concurrency = cliConcurrency;
+  } else if (config.concurrency !== undefined) {
+    analyzeOptions.concurrency = config.concurrency;
   }
 
-  analyzeOptions.cache = opts.cache as boolean;
+  const cacheSource = program.getOptionValueSource('cache');
+  analyzeOptions.cache = cacheSource === 'cli' ? (opts.cache as boolean) : (config.cache ?? true);
+
+  const submodules = (opts.submodules as boolean | undefined) ?? config.submodules ?? false;
+  const splitSubmodules =
+    (opts.splitSubmodules as boolean | undefined) ?? config.splitSubmodules ?? false;
+  const recursive = (opts.recursive as boolean | undefined) ?? config.recursive ?? false;
 
   if (submodules || splitSubmodules) {
     analyzeOptions.submodules = true;
   }
 
+  const formatSource = program.getOptionValueSource('format');
+  const format =
+    formatSource === 'cli' ? (opts.format as string) : (config.format ?? (opts.format as string));
+
+  const sortSource = program.getOptionValueSource('sort');
+  const sort =
+    sortSource === 'cli' ? (opts.sort as string) : (config.sort ?? (opts.sort as string));
+
+  const limitSource = program.getOptionValueSource('limit');
+  const limit =
+    limitSource === 'cli'
+      ? (opts.limit as number | undefined)
+      : (config.limit ?? (opts.limit as number | undefined));
+
   return {
     options: analyzeOptions,
-    format: opts.format as string,
+    format,
     renderOptions: {
-      sort: { by: opts.sort as SortableColumn, order: 'desc' as const },
-      ...(opts.limit !== undefined && !isNaN(opts.limit as number)
-        ? { limit: opts.limit as number }
-        : {}),
+      sort: { by: sort as SortableColumn, order: 'desc' as const },
+      ...(limit !== undefined && !isNaN(limit) ? { limit } : {}),
     },
     recursive,
     splitSubmodules,
