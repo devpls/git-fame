@@ -33,4 +33,5 @@ export interface AnalyzeOptions {
   includeGlobs?: string[];
   excludeGlobs?: string[];
   onProgress?: (event: ProgressEvent) => void;
+  submodules?: boolean;
 }

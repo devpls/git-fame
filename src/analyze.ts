@@ -1,5 +1,7 @@
+import { join } from 'node:path';
 import { ConflictingOptionsError } from './errors/conflicting-options.error.js';
 import { Aggregator } from './internal/identity/aggregator/index.js';
+import { discoverSubmodules } from './internal/git/discover-submodules.js';
 import { loadMailmap } from './internal/identity/mailmap/index.js';
 import { assembleReport } from './internal/pipeline/assemble-report.js';
 import { discover } from './internal/pipeline/discover.js';
@@ -85,6 +87,31 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
       options.onProgress,
     ),
   ]);
+
+  if (options.submodules === true) {
+    const submodules = discoverSubmodules(options.path);
+    for (const sub of submodules) {
+      if (!sub.initialized) {
+        aggregator.recordWarning({
+          code: 'UNINIT_SUBMODULE',
+          path: sub.path,
+          message: `submodule ${sub.path} is not initialized; skipped`,
+        });
+        continue;
+      }
+      const subReport = await analyze({
+        ...options,
+        path: join(options.path, sub.path),
+        submodules: false, // prevent infinite recursion
+      });
+      for (const author of subReport.authors) {
+        aggregator.mergeAuthorStats(author);
+      }
+      for (const warning of subReport.warnings) {
+        aggregator.recordWarning(warning);
+      }
+    }
+  }
 
   options.onProgress?.({ type: 'phase', phase: 'aggregate' });
   const durationMs = Date.now() - startMs;

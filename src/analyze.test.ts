@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { analyze } from './analyze.js';
 import { ConflictingOptionsError } from './errors/conflicting-options.error.js';
 import { buildRepo } from '../tests/helpers/build-repo.js';
+import { buildRepoWithSubmodule } from '../tests/helpers/build-repo-with-submodule.js';
 
 describe('analyze', () => {
   const createdRepos: string[] = [];
@@ -311,5 +312,40 @@ describe('analyze', () => {
     // Bob's commit is after the cutoff, so his linesAdded is counted
     const bob = report.authors.find((a) => a.email === 'b@x');
     expect(bob?.linesAdded).toBe(1);
+  });
+
+  it('merges submodule stats when submodules is true', async () => {
+    const { parentDir } = buildRepoWithSubmodule();
+    createdRepos.push(parentDir);
+
+    const report = await analyze({ path: parentDir, submodules: true });
+
+    // Parent has ParentAuthor, submodule has LibAuthor — both should appear
+    expect(report.authors.length).toBeGreaterThanOrEqual(2);
+    const libAuthor = report.authors.find((a) => a.email === 'lib@example.com');
+    expect(libAuthor).toBeDefined();
+    expect(libAuthor?.linesAlive).toBeGreaterThan(0);
+  });
+
+  it('emits UNINIT_SUBMODULE warning for uninitialised submodules', async () => {
+    const { parentDir, submoduleName } = buildRepoWithSubmodule();
+    createdRepos.push(parentDir);
+
+    // Deinit the submodule
+    spawnSync('git', ['submodule', 'deinit', '-f', submoduleName], { cwd: parentDir });
+
+    const report = await analyze({ path: parentDir, submodules: true });
+
+    expect(report.warnings.some((w) => w.code === 'UNINIT_SUBMODULE')).toBe(true);
+  });
+
+  it('ignores submodules by default', async () => {
+    const { parentDir } = buildRepoWithSubmodule();
+    createdRepos.push(parentDir);
+
+    const report = await analyze({ path: parentDir });
+
+    const libAuthor = report.authors.find((a) => a.email === 'lib@example.com');
+    expect(libAuthor).toBeUndefined();
   });
 });

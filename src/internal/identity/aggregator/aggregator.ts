@@ -88,6 +88,26 @@ export class Aggregator {
     this.warnings.push(warning);
   }
 
+  mergeAuthorStats(author: AuthorStats): void {
+    const stats = this.getOrCreate(author.name, author.email);
+    stats.linesAlive += author.linesAlive;
+    stats.linesAdded += author.linesAdded;
+    stats.linesDeleted += author.linesDeleted;
+    stats.commits += author.commits;
+    // files: generate unique placeholder keys to approximate the count
+    for (let i = 0; i < author.files; i += 1) {
+      stats.filesSet.add(`__sub__${author.email}__${String(stats.filesSet.size)}`);
+    }
+    const firstSec = Math.floor(author.firstCommit.getTime() / 1000);
+    const lastSec = Math.floor(author.lastCommit.getTime() / 1000);
+    if (stats.firstCommitTime === undefined || firstSec < stats.firstCommitTime) {
+      stats.firstCommitTime = firstSec;
+    }
+    if (stats.lastCommitTime === undefined || lastSec > stats.lastCommitTime) {
+      stats.lastCommitTime = lastSec;
+    }
+  }
+
   build(meta: Report['meta'], repoBase: Report['repo']): Report {
     const authors = Array.from(this.authors.values()).map(finaliseAuthor);
 
