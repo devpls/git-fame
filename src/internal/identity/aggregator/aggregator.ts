@@ -1,5 +1,6 @@
 import type { BlameLine } from '../../parse/parse-blame-porcelain/index.js';
 import type { LogCommit } from '../../parse/parse-log-numstat/index.js';
+import type { Mailmap } from '../mailmap/index.js';
 import type { AuthorStats } from '../../../types/author-stats.type.js';
 import type { Report } from '../../../types/report.type.js';
 import type { Warning } from '../../../types/warning.type.js';
@@ -33,18 +34,30 @@ const finaliseAuthor = (stats: MutableAuthorStats): AuthorStats => {
   };
 };
 
+const identityMailmap: Mailmap = {
+  canonicalize(name: string, email: string): { name: string; email: string } {
+    return { name, email };
+  },
+};
+
 export class Aggregator {
   private readonly authors = new Map<string, MutableAuthorStats>();
   private readonly warnings: Warning[] = [];
+  private readonly mailmap: Mailmap;
+
+  constructor(mailmap?: Mailmap) {
+    this.mailmap = mailmap ?? identityMailmap;
+  }
 
   private getOrCreate(name: string, email: string): MutableAuthorStats {
-    const existing = this.authors.get(email);
+    const canonical = this.mailmap.canonicalize(name, email);
+    const existing = this.authors.get(canonical.email);
     if (existing !== undefined) {
-      existing.name = name;
+      existing.name = canonical.name;
       return existing;
     }
-    const fresh = createEmptyStats(name, email);
-    this.authors.set(email, fresh);
+    const fresh = createEmptyStats(canonical.name, canonical.email);
+    this.authors.set(canonical.email, fresh);
     return fresh;
   }
 

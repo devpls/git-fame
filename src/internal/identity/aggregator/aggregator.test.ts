@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BlameLine } from '../../parse/parse-blame-porcelain/index.js';
 import type { LogCommit } from '../../parse/parse-log-numstat/index.js';
+import type { Mailmap } from '../mailmap/index.js';
 import type { Warning } from '../../../types/warning.type.js';
 import { Aggregator } from './aggregator.js';
 
@@ -240,5 +241,69 @@ describe('Aggregator.build', () => {
     );
     expect(report.authors[0]?.firstCommit).toBeInstanceOf(Date);
     expect(report.authors[0]?.lastCommit).toBeInstanceOf(Date);
+  });
+});
+
+const fixedMailmap: Mailmap = {
+  canonicalize(name: string, email: string): { name: string; email: string } {
+    if (email === 'alice@old') {
+      return { name: 'Alice Canonical', email: 'alice@new' };
+    }
+    return { name, email };
+  },
+};
+
+describe('Aggregator with mailmap', () => {
+  it('merges entries that the mailmap canonicalises to the same email', () => {
+    const agg = new Aggregator(fixedMailmap);
+    agg.recordCommit(
+      makeLogCommit({
+        authorName: 'Alice',
+        authorMail: 'alice@old',
+        files: [{ path: 'a.txt', added: 3, deleted: 0 }],
+      }),
+    );
+    agg.recordCommit(
+      makeLogCommit({
+        authorName: 'Alice Canonical',
+        authorMail: 'alice@new',
+        files: [{ path: 'b.txt', added: 2, deleted: 0 }],
+      }),
+    );
+
+    const stats = agg.getStatsForTesting();
+    expect(stats.size).toBe(1);
+    expect(stats.get('alice@new')?.linesAdded).toBe(5);
+  });
+
+  it('canonicalises blame lines too', () => {
+    const agg = new Aggregator(fixedMailmap);
+    agg.recordBlameLine(makeBlameLine({ authorName: 'alice', authorMail: 'alice@old' }));
+    agg.recordBlameLine(makeBlameLine({ authorName: 'Alice Canonical', authorMail: 'alice@new' }));
+
+    const stats = agg.getStatsForTesting();
+    expect(stats.size).toBe(1);
+    expect(stats.get('alice@new')?.linesAlive).toBe(2);
+  });
+
+  it('falls back to identity behaviour when no mailmap is provided', () => {
+    const agg = new Aggregator();
+    agg.recordCommit(
+      makeLogCommit({
+        authorName: 'Alice',
+        authorMail: 'alice@old',
+        files: [{ path: 'a.txt', added: 1, deleted: 0 }],
+      }),
+    );
+    agg.recordCommit(
+      makeLogCommit({
+        authorName: 'Alice',
+        authorMail: 'alice@new',
+        files: [{ path: 'b.txt', added: 1, deleted: 0 }],
+      }),
+    );
+
+    const stats = agg.getStatsForTesting();
+    expect(stats.size).toBe(2);
   });
 });
