@@ -246,7 +246,56 @@ describe('parseBlamePorcelain', () => {
     );
   });
 
-  it('parses real git blame --line-porcelain output for a two-author file', async () => {
+  it('reuses cached author info for subsequent lines from the same SHA', async () => {
+    const sha = '1111111111111111111111111111111111111111';
+    const fixture = buildBlameFixture([
+      {
+        sha,
+        origLine: 1,
+        finalLine: 1,
+        groupCount: 3,
+        authorName: 'Alice',
+        authorMail: 'alice@example.com',
+        authorTime: 1704067200,
+        summary: 'Multi-line commit',
+        filename: 'a.txt',
+        content: 'first',
+      },
+      {
+        sha,
+        origLine: 2,
+        finalLine: 2,
+        authorName: 'Alice',
+        authorMail: 'alice@example.com',
+        authorTime: 1704067200,
+        summary: 'Multi-line commit',
+        filename: 'a.txt',
+        content: 'second',
+      },
+      {
+        sha,
+        origLine: 3,
+        finalLine: 3,
+        authorName: 'Alice',
+        authorMail: 'alice@example.com',
+        authorTime: 1704067200,
+        summary: 'Multi-line commit',
+        filename: 'a.txt',
+        content: 'third',
+      },
+    ]);
+
+    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+
+    expect(lines).toHaveLength(3);
+    expect(lines.map((l) => l.line)).toEqual(['first', 'second', 'third']);
+    expect(lines.every((l) => l.authorName === 'Alice')).toBe(true);
+    expect(lines.every((l) => l.authorMail === 'alice@example.com')).toBe(true);
+    expect(lines.every((l) => l.authorTime === 1704067200)).toBe(true);
+    expect(lines.every((l) => l.sha === sha)).toBe(true);
+  });
+
+  it('parses real git blame --porcelain output for a two-author file', async () => {
     const dir = buildRepo([
       {
         author: 'Alice <alice@example.com>',
@@ -261,7 +310,7 @@ describe('parseBlamePorcelain', () => {
     ]);
     createdRepos.push(dir);
 
-    const result = spawnGit(['blame', '--line-porcelain', 'HEAD', '--', 'mixed.txt'], dir);
+    const result = spawnGit(['blame', '--porcelain', 'HEAD', '--', 'mixed.txt'], dir);
     const lines: BlameLine[] = [];
     const consume = async (): Promise<void> => {
       for await (const line of parseBlamePorcelain(result.stdout)) {

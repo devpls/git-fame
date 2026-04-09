@@ -18,7 +18,7 @@ const blameOneFile = async (
   options: BlameOptions,
 ): Promise<void> => {
   try {
-    const args = ['blame', '--line-porcelain', options.rev];
+    const args = ['blame', '--porcelain', options.rev];
     if (options.followRenames) {
       args.push('-M', '-C');
     }
@@ -53,7 +53,7 @@ export const runBlamePhase = async (
   if (files.length === 0) {
     return;
   }
-  const limit = pLimit(Math.max(1, cpus().length));
+  const limit = pLimit(Math.max(1, Math.min(cpus().length, 4)));
   let completed = 0;
   await Promise.all(
     files.map((file) =>
