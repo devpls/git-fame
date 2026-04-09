@@ -1,11 +1,25 @@
 export interface AnalyzeOptions {
   path: string;
 
+  /** Single commit-ish to analyze. Default: 'HEAD'. Mutually exclusive with `range`. */
+  rev?: string;
+
+  /** Commit range to analyze. Mutually exclusive with `rev`. */
+  range?: {
+    from: string;
+    to: string;
+  };
+
+  /** Only count log entries after this date. Blame is always at the upper ref. */
+  since?: Date;
+
+  /** Only count log entries before this date. Blame is always at the upper ref. */
+  until?: Date;
+
   include?: {
     whitespace?: boolean;
     binary?: boolean;
     generated?: boolean;
-    /** Include minified files. Default: true (minified ARE counted by default). */
     minified?: boolean;
   };
 
@@ -14,8 +28,6 @@ export interface AnalyzeOptions {
     applyMailmap?: boolean;
   };
 
-  /** Only analyze files matching at least one of these globs. Empty = all files. */
   includeGlobs?: string[];
-  /** Exclude files matching any of these globs. Exclude wins over include. */
   excludeGlobs?: string[];
 }
