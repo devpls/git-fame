@@ -1,0 +1,79 @@
+{
+  "name": "node-fame",
+  "version": "0.1.0",
+  "description": "Fast, accurate git contribution stats — lines, commits, files per author.",
+  "license": "MIT",
+  "author": "Mykhailo Kalashnikov",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": "./dist/cli/bin.js",
+  "zshy": {
+    "exports": {
+      ".": "./src/index.ts"
+    },
+    "bin": "./cli/bin.ts",
+    "cjs": false
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "lint": "eslint . && tsc --noEmit",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "coverage": "vitest run --coverage",
+    "format": "prettier --write .",
+    "build": "zshy",
+    "dev": "zshy --watch",
+    "prepare": "husky",
+    "prepublishOnly": "npm run lint && npm run test:run && npm run build"
+  },
+  "lint-staged": {
+    "*.{ts,js,cjs,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@types/cli-progress": "^3.11.6",
+    "@types/node": "^25.5.2",
+    "@types/picomatch": "^4.0.3",
+    "@vitest/coverage-v8": "^4.1.3",
+    "eslint": "^10.2.0",
+    "husky": "^9.1.7",
+    "jiti": "^2.6.1",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.1",
+    "vitest": "^4.1.3",
+    "zshy": "^0.7.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "module": "./dist/src/index.js",
+  "dependencies": {
+    "cli-progress": "^3.12.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "p-limit": "^7.3.0",
+    "picomatch": "^4.0.4"
+  }
+}
