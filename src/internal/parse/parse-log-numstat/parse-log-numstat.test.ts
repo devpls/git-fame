@@ -1,21 +1,10 @@
 import { rmSync } from 'node:fs';
-import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildLogFixture } from '../../../../tests/helpers/build-log-fixture.js';
 import { buildRepo } from '../../../../tests/helpers/build-repo.js';
+import { collectStream } from '../../git/collect-stream.js';
 import { spawnGit } from '../../git/spawn-git.js';
 import { parseLogNumstat } from './parse-log-numstat.js';
-import type { LogCommit } from './types/log-commit.type.js';
-
-const streamOf = (text: string): NodeJS.ReadableStream => Readable.from([text]);
-
-const collect = async (gen: AsyncGenerator<LogCommit>): Promise<LogCommit[]> => {
-  const out: LogCommit[] = [];
-  for await (const item of gen) {
-    out.push(item);
-  }
-  return out;
-};
 
 describe('parseLogNumstat', () => {
   const createdRepos: string[] = [];
@@ -28,7 +17,7 @@ describe('parseLogNumstat', () => {
     }
   });
 
-  it('parses a single commit with a single file', async () => {
+  it('parses a single commit with a single file', () => {
     const fixture = buildLogFixture([
       {
         sha: 'abc0000000000000000000000000000000000000',
@@ -39,7 +28,7 @@ describe('parseLogNumstat', () => {
       },
     ]);
 
-    const commits = await collect(parseLogNumstat(streamOf(fixture)));
+    const commits = parseLogNumstat(fixture);
 
     expect(commits).toHaveLength(1);
     expect(commits[0]).toStrictEqual({
@@ -51,7 +40,7 @@ describe('parseLogNumstat', () => {
     });
   });
 
-  it('parses a single commit with multiple files in order', async () => {
+  it('parses a single commit with multiple files in order', () => {
     const fixture = buildLogFixture([
       {
         sha: 'abc0000000000000000000000000000000000000',
@@ -66,13 +55,13 @@ describe('parseLogNumstat', () => {
       },
     ]);
 
-    const commits = await collect(parseLogNumstat(streamOf(fixture)));
+    const commits = parseLogNumstat(fixture);
 
     expect(commits).toHaveLength(1);
     expect(commits[0]?.files.map((f) => f.path)).toEqual(['first.txt', 'second.txt', 'third.txt']);
   });
 
-  it('parses multiple commits separated by blank lines', async () => {
+  it('parses multiple commits separated by blank lines', () => {
     const fixture = buildLogFixture([
       {
         sha: '1111111111111111111111111111111111111111',
@@ -90,7 +79,7 @@ describe('parseLogNumstat', () => {
       },
     ]);
 
-    const commits = await collect(parseLogNumstat(streamOf(fixture)));
+    const commits = parseLogNumstat(fixture);
 
     expect(commits).toHaveLength(2);
     expect(commits[0]?.authorName).toBe('Alice');
@@ -99,7 +88,7 @@ describe('parseLogNumstat', () => {
     expect(commits[1]?.files).toEqual([{ path: 'b.txt', added: 2, deleted: 1 }]);
   });
 
-  it('treats binary file markers as zero added and zero deleted', async () => {
+  it('treats binary file markers as zero added and zero deleted', () => {
     const fixture = buildLogFixture([
       {
         sha: 'abc0000000000000000000000000000000000000',
@@ -110,12 +99,12 @@ describe('parseLogNumstat', () => {
       },
     ]);
 
-    const commits = await collect(parseLogNumstat(streamOf(fixture)));
+    const commits = parseLogNumstat(fixture);
 
     expect(commits[0]?.files).toEqual([{ path: 'logo.png', added: 0, deleted: 0 }]);
   });
 
-  it('parses commits with zero files', async () => {
+  it('parses commits with zero files', () => {
     const fixture = buildLogFixture([
       {
         sha: 'abc0000000000000000000000000000000000000',
@@ -126,18 +115,18 @@ describe('parseLogNumstat', () => {
       },
     ]);
 
-    const commits = await collect(parseLogNumstat(streamOf(fixture)));
+    const commits = parseLogNumstat(fixture);
 
     expect(commits).toHaveLength(1);
     expect(commits[0]?.files).toEqual([]);
   });
 
-  it('yields nothing for an empty stream', async () => {
-    const commits = await collect(parseLogNumstat(streamOf('')));
+  it('yields nothing for an empty stream', () => {
+    const commits = parseLogNumstat('');
     expect(commits).toEqual([]);
   });
 
-  it('handles non-ASCII author and path', async () => {
+  it('handles non-ASCII author and path', () => {
     const fixture = buildLogFixture([
       {
         sha: 'a000000000000000000000000000000000000000',
@@ -148,25 +137,23 @@ describe('parseLogNumstat', () => {
       },
     ]);
 
-    const commits = await collect(parseLogNumstat(streamOf(fixture)));
+    const commits = parseLogNumstat(fixture);
 
     expect(commits[0]?.authorName).toBe('Михаил');
     expect(commits[0]?.authorMail).toBe('михаил@example.com');
     expect(commits[0]?.files[0]?.path).toBe('файл.txt');
   });
 
-  it('throws when a file line appears before any commit header', async () => {
+  it('throws when a file line appears before any commit header', () => {
     const bad = '1\t0\ta.txt\n';
-    await expect(collect(parseLogNumstat(streamOf(bad)))).rejects.toThrow(
-      /file entry before any commit header/,
-    );
+    expect(() => parseLogNumstat(bad)).toThrow(/file entry before any commit header/);
   });
 
-  it('throws on an unrecognised line', async () => {
+  it('throws on an unrecognised line', () => {
     const bad =
       'abc0000000000000000000000000000000000000\x00Alice\x00alice@example.com\x001704067200\n' +
       'not a file line\n';
-    await expect(collect(parseLogNumstat(streamOf(bad)))).rejects.toThrow(/unrecognised line/);
+    expect(() => parseLogNumstat(bad)).toThrow(/unrecognised line/);
   });
 
   it('parses real git log --numstat output for a multi-commit repo', async () => {
@@ -188,13 +175,8 @@ describe('parseLogNumstat', () => {
       ['log', '--no-merges', '--reverse', '--pretty=format:%H%x00%an%x00%ae%x00%at', '--numstat'],
       dir,
     );
-    const commits: LogCommit[] = [];
-    const consume = async (): Promise<void> => {
-      for await (const commit of parseLogNumstat(result.stdout)) {
-        commits.push(commit);
-      }
-    };
-    await Promise.all([consume(), result.done]);
+    const [output] = await Promise.all([collectStream(result.stdout), result.done]);
+    const commits = parseLogNumstat(output);
 
     expect(commits).toHaveLength(2);
     expect(commits[0]?.authorName).toBe('Alice');

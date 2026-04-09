@@ -1,3 +1,4 @@
+import { collectStream } from '../git/collect-stream.js';
 import { spawnGit } from '../git/spawn-git.js';
 import { parseLogNumstat } from '../parse/parse-log-numstat/index.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
@@ -34,14 +35,12 @@ export const runLogPhase = async (
 
   const result = spawnGit(args, cwd);
 
-  const consume = async (): Promise<void> => {
-    for await (const commit of parseLogNumstat(result.stdout)) {
+  try {
+    const [output] = await Promise.all([collectStream(result.stdout), result.done]);
+    const commits = parseLogNumstat(output);
+    for (const commit of commits) {
       aggregator.recordCommit(commit);
     }
-  };
-
-  try {
-    await Promise.all([consume(), result.done]);
   } catch (err) {
     // Empty repo causes git log to exit non-zero ("does not have any commits yet").
     // That is a legitimate empty state; the aggregator simply has no data.

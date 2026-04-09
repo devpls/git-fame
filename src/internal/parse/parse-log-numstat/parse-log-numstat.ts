@@ -1,37 +1,44 @@
-import { createInterface } from 'node:readline';
 import { appendFileEntry } from './helpers/append-file-entry.js';
 import { parseCommitHeader } from './helpers/parse-commit-header.js';
 import type { LogCommit } from './types/log-commit.type.js';
 
 const NUMSTAT_REGEX = /^(\d+|-)\t(\d+|-)\t(.+)$/;
 
-export async function* parseLogNumstat(stream: NodeJS.ReadableStream): AsyncGenerator<LogCommit> {
-  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+export const parseLogNumstat = (output: string): LogCommit[] => {
+  const results: LogCommit[] = [];
   let current: LogCommit | null = null;
 
-  for await (const raw of rl) {
+  for (const raw of output.split('\n')) {
     if (raw.length === 0) {
       continue;
     }
 
-    if (raw.includes('\x00')) {
-      if (current !== null) {
-        yield current;
-      }
-      current = parseCommitHeader(raw);
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+
+    if (line.length === 0) {
       continue;
     }
 
-    const numstatMatch = NUMSTAT_REGEX.exec(raw);
+    if (line.includes('\x00')) {
+      if (current !== null) {
+        results.push(current);
+      }
+      current = parseCommitHeader(line);
+      continue;
+    }
+
+    const numstatMatch = NUMSTAT_REGEX.exec(line);
     if (numstatMatch !== null) {
       appendFileEntry(current, numstatMatch);
       continue;
     }
 
-    throw new Error(`parseLogNumstat: unrecognised line: ${raw}`);
+    throw new Error(`parseLogNumstat: unrecognised line: ${line}`);
   }
 
   if (current !== null) {
-    yield current;
+    results.push(current);
   }
-}
+
+  return results;
+};

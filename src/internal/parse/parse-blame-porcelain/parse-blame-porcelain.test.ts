@@ -1,21 +1,10 @@
 import { rmSync } from 'node:fs';
-import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildBlameFixture } from '../../../../tests/helpers/build-blame-fixture.js';
 import { buildRepo } from '../../../../tests/helpers/build-repo.js';
+import { collectStream } from '../../git/collect-stream.js';
 import { spawnGit } from '../../git/spawn-git.js';
 import { parseBlamePorcelain } from './parse-blame-porcelain.js';
-import type { BlameLine } from './types/blame-line.type.js';
-
-const streamOf = (text: string): NodeJS.ReadableStream => Readable.from([text]);
-
-const collect = async (gen: AsyncGenerator<BlameLine>): Promise<BlameLine[]> => {
-  const out: BlameLine[] = [];
-  for await (const item of gen) {
-    out.push(item);
-  }
-  return out;
-};
 
 describe('parseBlamePorcelain', () => {
   const createdRepos: string[] = [];
@@ -28,7 +17,7 @@ describe('parseBlamePorcelain', () => {
     }
   });
 
-  it('parses a single content line with full header block', async () => {
+  it('parses a single content line with full header block', () => {
     const fixture = buildBlameFixture([
       {
         sha: '3f1c2a7b9d4e5f6a1c8b9d0e2f3a4b5c6d7e8f90',
@@ -44,7 +33,7 @@ describe('parseBlamePorcelain', () => {
       },
     ]);
 
-    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+    const lines = parseBlamePorcelain(fixture);
 
     expect(lines).toHaveLength(1);
     expect(lines[0]).toStrictEqual({
@@ -57,7 +46,7 @@ describe('parseBlamePorcelain', () => {
     });
   });
 
-  it('parses multiple lines from the same commit in order', async () => {
+  it('parses multiple lines from the same commit in order', () => {
     const fixture = buildBlameFixture([
       {
         sha: '1111111111111111111111111111111111111111',
@@ -95,13 +84,13 @@ describe('parseBlamePorcelain', () => {
       },
     ]);
 
-    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+    const lines = parseBlamePorcelain(fixture);
 
     expect(lines.map((l) => l.line)).toEqual(['line one', 'line two', 'line three']);
     expect(lines.every((l) => l.authorName === 'Alice')).toBe(true);
   });
 
-  it('sets isBoundary to true when the boundary marker is present', async () => {
+  it('sets isBoundary to true when the boundary marker is present', () => {
     const fixture = buildBlameFixture([
       {
         sha: 'ccc0000000000000000000000000000000000000',
@@ -118,13 +107,13 @@ describe('parseBlamePorcelain', () => {
       },
     ]);
 
-    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+    const lines = parseBlamePorcelain(fixture);
 
     expect(lines).toHaveLength(1);
     expect(lines[0]?.isBoundary).toBe(true);
   });
 
-  it('tracks distinct authors across consecutive entries', async () => {
+  it('tracks distinct authors across consecutive entries', () => {
     const fixture = buildBlameFixture([
       {
         sha: 'aaa0000000000000000000000000000000000000',
@@ -152,7 +141,7 @@ describe('parseBlamePorcelain', () => {
       },
     ]);
 
-    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+    const lines = parseBlamePorcelain(fixture);
 
     expect(lines).toHaveLength(2);
     expect(lines[0]?.authorName).toBe('Alice');
@@ -161,7 +150,7 @@ describe('parseBlamePorcelain', () => {
     expect(lines[1]?.line).toBe('written by bob');
   });
 
-  it('handles non-ASCII author names, emails, and content', async () => {
+  it('handles non-ASCII author names, emails, and content', () => {
     const fixture = buildBlameFixture([
       {
         sha: 'a000000000000000000000000000000000000000',
@@ -177,7 +166,7 @@ describe('parseBlamePorcelain', () => {
       },
     ]);
 
-    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+    const lines = parseBlamePorcelain(fixture);
 
     expect(lines[0]).toStrictEqual({
       sha: 'a000000000000000000000000000000000000000',
@@ -189,12 +178,12 @@ describe('parseBlamePorcelain', () => {
     });
   });
 
-  it('yields nothing for an empty stream', async () => {
-    const lines = await collect(parseBlamePorcelain(streamOf('')));
+  it('yields nothing for an empty stream', () => {
+    const lines = parseBlamePorcelain('');
     expect(lines).toEqual([]);
   });
 
-  it('parses CRLF line endings as if they were LF', async () => {
+  it('parses CRLF line endings as if they were LF', () => {
     const fixture = buildBlameFixture([
       {
         sha: 'a000000000000000000000000000000000000000',
@@ -211,42 +200,38 @@ describe('parseBlamePorcelain', () => {
     ]);
     const crlfFixture = fixture.replace(/\n/g, '\r\n');
 
-    const lines = await collect(parseBlamePorcelain(streamOf(crlfFixture)));
+    const lines = parseBlamePorcelain(crlfFixture);
 
     expect(lines).toHaveLength(1);
     expect(lines[0]?.line).toBe('hello');
   });
 
-  it('throws when a content line arrives without a complete header block', async () => {
+  it('throws when a content line arrives without a complete header block', () => {
     const malformed = '\tjust content, no header\n';
-    await expect(collect(parseBlamePorcelain(streamOf(malformed)))).rejects.toThrow(
-      /content line before complete header/,
-    );
+    expect(() => parseBlamePorcelain(malformed)).toThrow(/content line before complete header/);
   });
 
-  it('throws on unexpected end of stream mid-block', async () => {
+  it('throws on unexpected end of stream mid-block', () => {
     const truncated =
       'a000000000000000000000000000000000000000 1 1 1\n' +
       'author Alice\n' +
       'author-mail <alice@example.com>\n';
-    await expect(collect(parseBlamePorcelain(streamOf(truncated)))).rejects.toThrow(
-      /unexpected end of stream/,
-    );
+    expect(() => parseBlamePorcelain(truncated)).toThrow(/unexpected end of stream/);
   });
 
-  it('throws when a header line arrives before the previous entry finished', async () => {
+  it('throws when a header line arrives before the previous entry finished', () => {
     const bad =
       'a000000000000000000000000000000000000000 1 1 1\n' +
       'author Alice\n' +
       'author-mail <alice@example.com>\n' +
       'author-time 1704067200\n' +
       'b000000000000000000000000000000000000000 2 2\n';
-    await expect(collect(parseBlamePorcelain(streamOf(bad)))).rejects.toThrow(
+    expect(() => parseBlamePorcelain(bad)).toThrow(
       /header line arrived before previous entry finished/,
     );
   });
 
-  it('reuses cached author info for subsequent lines from the same SHA', async () => {
+  it('reuses cached author info for subsequent lines from the same SHA', () => {
     const sha = '1111111111111111111111111111111111111111';
     const fixture = buildBlameFixture([
       {
@@ -285,7 +270,7 @@ describe('parseBlamePorcelain', () => {
       },
     ]);
 
-    const lines = await collect(parseBlamePorcelain(streamOf(fixture)));
+    const lines = parseBlamePorcelain(fixture);
 
     expect(lines).toHaveLength(3);
     expect(lines.map((l) => l.line)).toEqual(['first', 'second', 'third']);
@@ -311,13 +296,8 @@ describe('parseBlamePorcelain', () => {
     createdRepos.push(dir);
 
     const result = spawnGit(['blame', '--porcelain', 'HEAD', '--', 'mixed.txt'], dir);
-    const lines: BlameLine[] = [];
-    const consume = async (): Promise<void> => {
-      for await (const line of parseBlamePorcelain(result.stdout)) {
-        lines.push(line);
-      }
-    };
-    await Promise.all([consume(), result.done]);
+    const [output] = await Promise.all([collectStream(result.stdout), result.done]);
+    const lines = parseBlamePorcelain(output);
 
     expect(lines).toHaveLength(3);
     expect(lines[0]?.authorName).toBe('Alice');

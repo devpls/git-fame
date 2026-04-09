@@ -95,10 +95,10 @@ The keyword carries architectural meaning.
 - **`const foo = (args): Ret => { ... }`** — arrow function, the default for
   every stateless operation. The absence of `this` in arrows is the feature
   that expresses "this code is stateless, do not couple it to any context".
-- **`function` keyword** — only for generators: `function*` and `async
-function*`. Arrow generators do not exist in JavaScript. Parsers like
-  `parseBlamePorcelain` and `parseLogNumstat` will use `async function*`.
-  Nothing else uses the `function` keyword.
+- **`function` keyword** — not used. All code uses arrow functions. The
+  historical exception for generators (`function*`, `async function*`) no
+  longer applies since `parseBlamePorcelain` and `parseLogNumstat` were
+  converted to synchronous arrow functions returning arrays.
 
 ### No hoisting
 

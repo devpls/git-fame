@@ -1,4 +1,3 @@
-import { createInterface } from 'node:readline';
 import { applyMetadataLine } from './helpers/apply-metadata-line.js';
 import { beginNewEntry } from './helpers/begin-new-entry.js';
 import { finaliseContentLine } from './helpers/finalise-content-line.js';
@@ -14,43 +13,47 @@ interface CachedBlameInfo {
 
 const HEADER_REGEX = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/;
 
-export async function* parseBlamePorcelain(
-  stream: NodeJS.ReadableStream,
-): AsyncGenerator<BlameLine> {
-  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+export const parseBlamePorcelain = (output: string): BlameLine[] => {
   const cache = new Map<string, CachedBlameInfo>();
+  const results: BlameLine[] = [];
   let state: PartialBlameLine | null = null;
   let cachedEntry: CachedBlameInfo | undefined;
 
-  for await (const raw of rl) {
-    if (raw.startsWith('\t')) {
+  for (const raw of output.split('\n')) {
+    if (raw.length === 0) {
+      continue;
+    }
+
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+
+    if (line.startsWith('\t')) {
       if (cachedEntry !== undefined) {
         const entry = cachedEntry;
         cachedEntry = undefined;
-        yield {
+        results.push({
           sha: state?.sha ?? '',
           authorName: entry.authorName,
           authorMail: entry.authorMail,
           authorTime: entry.authorTime,
-          line: raw.slice(1),
+          line: line.slice(1),
           isBoundary: entry.isBoundary,
-        };
+        });
         state = null;
         continue;
       }
-      const line = finaliseContentLine(state, raw);
-      cache.set(line.sha, {
-        authorName: line.authorName,
-        authorMail: line.authorMail,
-        authorTime: line.authorTime,
-        isBoundary: line.isBoundary,
+      const blameLine = finaliseContentLine(state, line);
+      cache.set(blameLine.sha, {
+        authorName: blameLine.authorName,
+        authorMail: blameLine.authorMail,
+        authorTime: blameLine.authorTime,
+        isBoundary: blameLine.isBoundary,
       });
       state = null;
-      yield line;
+      results.push(blameLine);
       continue;
     }
 
-    const headerMatch = HEADER_REGEX.exec(raw);
+    const headerMatch = HEADER_REGEX.exec(line);
     if (headerMatch !== null) {
       const sha = headerMatch[1] ?? '';
       const cached = cache.get(sha);
@@ -68,19 +71,21 @@ export async function* parseBlamePorcelain(
       continue;
     }
 
-    if (raw.startsWith('filename ')) {
+    if (line.startsWith('filename ')) {
       // skip — not needed for output
       continue;
     }
 
     if (state === null) {
-      throw new Error(`parseBlamePorcelain: unexpected line outside of a block: ${raw}`);
+      throw new Error(`parseBlamePorcelain: unexpected line outside of a block: ${line}`);
     }
 
-    applyMetadataLine(state, raw);
+    applyMetadataLine(state, line);
   }
 
   if (state !== null) {
     throw new Error('parseBlamePorcelain: unexpected end of stream in the middle of a block');
   }
-}
+
+  return results;
+};

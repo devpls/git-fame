@@ -1,5 +1,6 @@
 import { cpus } from 'node:os';
 import pLimit from 'p-limit';
+import { collectStream } from '../git/collect-stream.js';
 import { spawnGit } from '../git/spawn-git.js';
 import { parseBlamePorcelain } from '../parse/parse-blame-porcelain/index.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
@@ -27,12 +28,11 @@ const blameOneFile = async (
     }
     args.push('--', file);
     const result = spawnGit(args, cwd);
-    const consume = async (): Promise<void> => {
-      for await (const line of parseBlamePorcelain(result.stdout)) {
-        aggregator.recordBlameLine(line);
-      }
-    };
-    await Promise.all([consume(), result.done]);
+    const [output] = await Promise.all([collectStream(result.stdout), result.done]);
+    const blameLines = parseBlamePorcelain(output);
+    for (const line of blameLines) {
+      aggregator.recordBlameLine(line);
+    }
   } catch (err) {
     aggregator.recordWarning({
       code: 'BLAME_FAILED',
