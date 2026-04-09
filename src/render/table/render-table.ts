@@ -1,27 +1,10 @@
 import Table from 'cli-table3';
-import type { AuthorStats } from '../../types/author-stats.type.js';
 import type { Report } from '../../types/report.type.js';
+import { prepareAuthors } from '../helpers/prepare-authors.js';
+import type { RenderOptions } from '../types/render-options.type.js';
 
-const formatPercent = (value: number, total: number): string => {
-  if (total === 0) {
-    return '0.0';
-  }
-  return ((value / total) * 100).toFixed(1);
-};
-
-const authorRow = (author: AuthorStats, totalLinesAlive: number): string[] => [
-  `${author.name} <${author.email}>`,
-  String(author.linesAlive),
-  String(author.linesAdded),
-  String(author.linesDeleted),
-  String(author.commits),
-  String(author.files),
-  formatPercent(author.linesAlive, totalLinesAlive),
-];
-
-export const renderTable = (report: Report): string => {
-  const sorted = [...report.authors].sort((a, b) => b.linesAlive - a.linesAlive);
-  const totalLinesAlive = sorted.reduce((acc, author) => acc + author.linesAlive, 0);
+export const renderTable = (report: Report, options?: RenderOptions): string => {
+  const prepared = prepareAuthors(report, options);
 
   const table = new Table({
     head: [
@@ -35,8 +18,16 @@ export const renderTable = (report: Report): string => {
     ],
   });
 
-  for (const author of sorted) {
-    table.push(authorRow(author, totalLinesAlive));
+  for (const author of prepared) {
+    table.push([
+      `${author.name} <${author.email}>`,
+      String(author.linesAlive),
+      String(author.linesAdded),
+      String(author.linesDeleted),
+      String(author.commits),
+      String(author.files),
+      author.percentAlive,
+    ]);
   }
 
   return table.toString();
