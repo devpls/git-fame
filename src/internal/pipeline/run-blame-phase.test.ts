@@ -223,6 +223,34 @@ describe('runBlamePhase', () => {
     expect(stats.get('bot@x')?.linesAlive).toBeUndefined();
   });
 
+  it('calls onProgress after each file', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'one\n', 'b.txt': 'two\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const agg = new Aggregator();
+    const events: { done: number; total: number }[] = [];
+    await runBlamePhase(
+      dir,
+      ['a.txt', 'b.txt'],
+      agg,
+      { rev: 'HEAD', followRenames: true, ignoreWhitespace: true },
+      (ev) => {
+        if (ev.type === 'blame') events.push({ done: ev.done, total: ev.total });
+      },
+    );
+
+    expect(events).toEqual([
+      { done: 1, total: 2 },
+      { done: 2, total: 2 },
+    ]);
+  });
+
   it('blames at a specific tag revision', async () => {
     const { spawnSync } = await import('node:child_process');
 

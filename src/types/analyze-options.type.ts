@@ -1,3 +1,5 @@
+import type { ProgressEvent } from './progress-event.type.js';
+
 export interface AnalyzeOptions {
   path: string;
 
@@ -30,4 +32,5 @@ export interface AnalyzeOptions {
 
   includeGlobs?: string[];
   excludeGlobs?: string[];
+  onProgress?: (event: ProgressEvent) => void;
 }

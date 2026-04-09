@@ -3,6 +3,7 @@ import pLimit from 'p-limit';
 import { spawnGit } from '../git/spawn-git.js';
 import { parseBlamePorcelain } from '../parse/parse-blame-porcelain/index.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
+import type { ProgressEvent } from '../../types/progress-event.type.js';
 
 export interface BlameOptions {
   rev: string;
@@ -47,10 +48,20 @@ export const runBlamePhase = async (
   files: readonly string[],
   aggregator: Aggregator,
   options: BlameOptions,
+  onProgress?: (event: ProgressEvent) => void,
 ): Promise<void> => {
   if (files.length === 0) {
     return;
   }
   const limit = pLimit(Math.max(1, cpus().length));
-  await Promise.all(files.map((file) => limit(() => blameOneFile(cwd, file, aggregator, options))));
+  let completed = 0;
+  await Promise.all(
+    files.map((file) =>
+      limit(async () => {
+        await blameOneFile(cwd, file, aggregator, options);
+        completed += 1;
+        onProgress?.({ type: 'blame', file, done: completed, total: files.length });
+      }),
+    ),
+  );
 };

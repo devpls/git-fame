@@ -49,6 +49,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     excludeGlobs,
   } = resolveDefaults(options);
 
+  options.onProgress?.({ type: 'phase', phase: 'discover' });
   const discovered = await discover(options.path, {
     includeGenerated,
     includeMinified,
@@ -64,6 +65,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     aggregator.recordWarning(warning);
   }
 
+  options.onProgress?.({ type: 'phase', phase: 'log' });
   const logOptions: LogPhaseOptions = {
     ...(discovered.range !== undefined && {
       range: { fromSha: discovered.range.fromSha, toSha: discovered.range.toSha },
@@ -72,15 +74,19 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     ...(options.until !== undefined && { until: options.until }),
   };
 
+  options.onProgress?.({ type: 'phase', phase: 'blame' });
   await Promise.all([
     runLogPhase(options.path, aggregator, logOptions),
-    runBlamePhase(options.path, discovered.files, aggregator, {
-      rev: discovered.headSha,
-      followRenames,
-      ignoreWhitespace,
-    }),
+    runBlamePhase(
+      options.path,
+      discovered.files,
+      aggregator,
+      { rev: discovered.headSha, followRenames, ignoreWhitespace },
+      options.onProgress,
+    ),
   ]);
 
+  options.onProgress?.({ type: 'phase', phase: 'aggregate' });
   const durationMs = Date.now() - startMs;
 
   return assembleReport(aggregator, {
