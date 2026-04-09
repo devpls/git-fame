@@ -348,4 +348,48 @@ describe('analyze', () => {
     const libAuthor = report.authors.find((a) => a.email === 'lib@example.com');
     expect(libAuthor).toBeUndefined();
   });
+
+  it('works in detached HEAD state', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'line one\n' },
+      },
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-02T00:00:00Z',
+        files: { 'a.txt': 'line two\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const logResult = spawnSync('git', ['log', '--format=%H', '-1', 'HEAD~1'], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    const parentSha = logResult.stdout.trim();
+    spawnSync('git', ['checkout', parentSha], { cwd: dir, encoding: 'utf8' });
+
+    const report = await analyze({ path: dir });
+
+    expect(report.repo.headSha).toBe(parentSha);
+    expect(report.authors.length).toBeGreaterThan(0);
+  });
+
+  it('reports zero linesAlive when all files are excluded by generated filter', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'package-lock.json': '{"lockfileVersion":3}\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir });
+
+    const totalLinesAlive = report.authors.reduce((sum, a) => sum + a.linesAlive, 0);
+    expect(totalLinesAlive).toBe(0);
+  });
 });
