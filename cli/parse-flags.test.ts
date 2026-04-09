@@ -88,4 +88,20 @@ describe('parseFlags', () => {
     const { renderOptions } = parseFlags([...base, '--limit', '5']);
     expect(renderOptions.limit).toBe(5);
   });
+
+  it('sets submodules flag', () => {
+    const { options } = parseFlags([...base, '--submodules']);
+    expect(options.submodules).toBe(true);
+  });
+
+  it('sets recursive flag', () => {
+    const { recursive } = parseFlags([...base, '--recursive']);
+    expect(recursive).toBe(true);
+  });
+
+  it('sets splitSubmodules and implies submodules', () => {
+    const result = parseFlags([...base, '--split-submodules']);
+    expect(result.splitSubmodules).toBe(true);
+    expect(result.options.submodules).toBe(true);
+  });
 });
