@@ -1,10 +1,15 @@
 import { join } from 'node:path';
 import { NotAGitRepoError } from '../../errors/not-a-git-repo.error.js';
+import { isGenerated, loadGitattributes } from '../filter/is-generated/index.js';
 import type { Warning } from '../../types/warning.type.js';
 import { isBinary } from '../filter/is-binary/index.js';
 import { isGitRepo } from '../git/is-git-repo.js';
 import { listTrackedFiles } from '../git/list-tracked-files.js';
 import { resolveRev } from '../git/resolve-rev.js';
+
+export interface DiscoverOptions {
+  includeGenerated: boolean;
+}
 
 export interface DiscoverResult {
   headSha: string;
@@ -13,7 +18,7 @@ export interface DiscoverResult {
   warnings: Warning[];
 }
 
-export const discover = async (cwd: string): Promise<DiscoverResult> => {
+export const discover = async (cwd: string, options: DiscoverOptions): Promise<DiscoverResult> => {
   if (!isGitRepo(cwd)) {
     throw new NotAGitRepoError(cwd);
   }
@@ -23,9 +28,19 @@ export const discover = async (cwd: string): Promise<DiscoverResult> => {
   const warnings: Warning[] = [];
   const textFiles: string[] = [];
 
+  const attrs = options.includeGenerated ? null : loadGitattributes(cwd);
+
   for (const relPath of allFiles) {
     const absPath = join(cwd, relPath);
     try {
+      if (attrs !== null && isGenerated(relPath, attrs)) {
+        warnings.push({
+          code: 'FILE_SKIPPED_GENERATED',
+          file: relPath,
+          message: `${relPath} is generated; excluded from analysis`,
+        });
+        continue;
+      }
       if (isBinary(absPath)) {
         warnings.push({
           code: 'FILE_SKIPPED_BINARY',

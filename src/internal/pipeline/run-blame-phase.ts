@@ -4,9 +4,27 @@ import { spawnGit } from '../git/spawn-git.js';
 import { parseBlamePorcelain } from '../parse/parse-blame-porcelain/index.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
 
-const blameOneFile = async (cwd: string, file: string, aggregator: Aggregator): Promise<void> => {
+export interface BlameOptions {
+  followRenames: boolean;
+  ignoreWhitespace: boolean;
+}
+
+const blameOneFile = async (
+  cwd: string,
+  file: string,
+  aggregator: Aggregator,
+  options: BlameOptions,
+): Promise<void> => {
   try {
-    const result = spawnGit(['blame', '--line-porcelain', 'HEAD', '--', file], cwd);
+    const args = ['blame', '--line-porcelain', 'HEAD'];
+    if (options.followRenames) {
+      args.push('-M', '-C');
+    }
+    if (options.ignoreWhitespace) {
+      args.push('-w');
+    }
+    args.push('--', file);
+    const result = spawnGit(args, cwd);
     const consume = async (): Promise<void> => {
       for await (const line of parseBlamePorcelain(result.stdout)) {
         aggregator.recordBlameLine(line);
@@ -27,10 +45,11 @@ export const runBlamePhase = async (
   cwd: string,
   files: readonly string[],
   aggregator: Aggregator,
+  options: BlameOptions,
 ): Promise<void> => {
   if (files.length === 0) {
     return;
   }
   const limit = pLimit(Math.max(1, cpus().length));
-  await Promise.all(files.map((file) => limit(() => blameOneFile(cwd, file, aggregator))));
+  await Promise.all(files.map((file) => limit(() => blameOneFile(cwd, file, aggregator, options))));
 };

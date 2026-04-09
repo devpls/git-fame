@@ -27,7 +27,7 @@ describe('discover', () => {
     ]);
     createdRepos.push(dir);
 
-    const result = await discover(dir);
+    const result = await discover(dir, { includeGenerated: false });
 
     expect(result.headSha).toMatch(/^[0-9a-f]{40}$/);
     expect(result.headRef).toBe('HEAD');
@@ -62,7 +62,7 @@ describe('discover', () => {
       },
     });
 
-    const result = await discover(dir);
+    const result = await discover(dir, { includeGenerated: false });
 
     expect(result.files).toEqual(['text.txt']);
     expect(result.warnings).toHaveLength(1);
@@ -72,13 +72,68 @@ describe('discover', () => {
   it('throws NotAGitRepoError for a non-git directory', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'nfd-nongit-'));
     createdRepos.push(dir);
-    await expect(discover(dir)).rejects.toBeInstanceOf(NotAGitRepoError);
+    await expect(discover(dir, { includeGenerated: false })).rejects.toBeInstanceOf(
+      NotAGitRepoError,
+    );
   });
 
   it('returns an empty files list for an empty repo', async () => {
     const dir = buildRepo([]);
     createdRepos.push(dir);
-    const result = await discover(dir);
+    const result = await discover(dir, { includeGenerated: false });
     expect(result.files).toEqual([]);
+  });
+
+  it('filters out package-lock.json from the result', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'hello\n', 'package-lock.json': '{"lockfileVersion":3}\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const result = await discover(dir, { includeGenerated: false });
+
+    expect(result.files).toEqual(['a.txt']);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]?.code).toBe('FILE_SKIPPED_GENERATED');
+  });
+
+  it('keeps package-lock.json when includeGenerated is true', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'hello\n', 'package-lock.json': '{"lockfileVersion":3}\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const result = await discover(dir, { includeGenerated: true });
+
+    expect(result.files.sort()).toEqual(['a.txt', 'package-lock.json']);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('honours .gitattributes linguist-generated=false to whitelist a built-in pattern', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: {
+          'a.txt': 'hello\n',
+          'package-lock.json': '{"lockfileVersion":3}\n',
+          '.gitattributes': 'package-lock.json linguist-generated=false\n',
+        },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const result = await discover(dir, { includeGenerated: false });
+
+    expect(result.files.sort()).toEqual(['.gitattributes', 'a.txt', 'package-lock.json']);
+    expect(result.warnings).toEqual([]);
   });
 });

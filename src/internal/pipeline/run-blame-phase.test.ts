@@ -1,4 +1,5 @@
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Aggregator } from '../identity/aggregator/index.js';
 import { buildRepo } from '../../../tests/helpers/build-repo.js';
@@ -26,7 +27,10 @@ describe('runBlamePhase', () => {
     createdRepos.push(dir);
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, ['a.txt', 'b.txt'], agg);
+    await runBlamePhase(dir, ['a.txt', 'b.txt'], agg, {
+      followRenames: true,
+      ignoreWhitespace: true,
+    });
 
     const stats = agg.getStatsForTesting().get('a@x');
     expect(stats?.linesAlive).toBe(4);
@@ -48,7 +52,7 @@ describe('runBlamePhase', () => {
     createdRepos.push(dir);
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, ['a.txt'], agg);
+    await runBlamePhase(dir, ['a.txt'], agg, { followRenames: true, ignoreWhitespace: true });
 
     const stats = agg.getStatsForTesting();
     expect(stats.get('a@x')?.linesAlive).toBe(1);
@@ -66,7 +70,10 @@ describe('runBlamePhase', () => {
     createdRepos.push(dir);
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, ['a.txt', 'does-not-exist.txt'], agg);
+    await runBlamePhase(dir, ['a.txt', 'does-not-exist.txt'], agg, {
+      followRenames: true,
+      ignoreWhitespace: true,
+    });
 
     expect(agg.getStatsForTesting().get('a@x')?.linesAlive).toBe(1);
     const warnings = agg.getWarningsForTesting();
@@ -84,7 +91,117 @@ describe('runBlamePhase', () => {
     createdRepos.push(dir);
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, [], agg);
+    await runBlamePhase(dir, [], agg, { followRenames: true, ignoreWhitespace: true });
     expect(agg.getStatsForTesting().size).toBe(0);
+  });
+
+  it('attributes whitespace-only edits to the original author when ignoreWhitespace is true', async () => {
+    const { spawnSync } = await import('node:child_process');
+
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'function foo() {\n  return 1;\n}\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    // Bob only changes indentation (whitespace-only edit)
+    writeFileSync(join(dir, 'a.txt'), 'function foo() {\n    return 1;\n}\n', 'utf8');
+    spawnSync('git', ['add', 'a.txt'], { cwd: dir });
+    spawnSync('git', ['commit', '-m', 'indent change'], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Bot',
+        GIT_AUTHOR_EMAIL: 'bot@x',
+        GIT_AUTHOR_DATE: '2024-01-02T00:00:00Z',
+        GIT_COMMITTER_NAME: 'Bot',
+        GIT_COMMITTER_EMAIL: 'bot@x',
+        GIT_COMMITTER_DATE: '2024-01-02T00:00:00Z',
+      },
+    });
+
+    const agg = new Aggregator();
+    await runBlamePhase(dir, ['a.txt'], agg, { followRenames: false, ignoreWhitespace: true });
+
+    const stats = agg.getStatsForTesting();
+    // With -w, Alice should still own all 3 lines
+    expect(stats.get('a@x')?.linesAlive).toBe(3);
+    expect(stats.get('bot@x')?.linesAlive).toBeUndefined();
+  });
+
+  it('attributes whitespace edits to the bot when ignoreWhitespace is false', async () => {
+    const { spawnSync } = await import('node:child_process');
+
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'function foo() {\n  return 1;\n}\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    // Bot only changes indentation (whitespace-only edit)
+    writeFileSync(join(dir, 'a.txt'), 'function foo() {\n    return 1;\n}\n', 'utf8');
+    spawnSync('git', ['add', 'a.txt'], { cwd: dir });
+    spawnSync('git', ['commit', '-m', 'indent change'], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Bot',
+        GIT_AUTHOR_EMAIL: 'bot@x',
+        GIT_AUTHOR_DATE: '2024-01-02T00:00:00Z',
+        GIT_COMMITTER_NAME: 'Bot',
+        GIT_COMMITTER_EMAIL: 'bot@x',
+        GIT_COMMITTER_DATE: '2024-01-02T00:00:00Z',
+      },
+    });
+
+    const agg = new Aggregator();
+    await runBlamePhase(dir, ['a.txt'], agg, { followRenames: false, ignoreWhitespace: false });
+
+    const stats = agg.getStatsForTesting();
+    // Without -w, Bot owns the indentation-changed line (only "  return 1;" changed to "    return 1;")
+    expect(stats.get('bot@x')?.linesAlive).toBe(1);
+    expect(stats.get('a@x')?.linesAlive).toBe(2);
+  });
+
+  it('follows renames when followRenames is true', async () => {
+    const { spawnSync } = await import('node:child_process');
+
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'old.txt': 'line one\nline two\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    // Bot renames the file without content changes
+    spawnSync('git', ['mv', 'old.txt', 'new.txt'], { cwd: dir });
+    spawnSync('git', ['commit', '-m', 'rename file'], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Bot',
+        GIT_AUTHOR_EMAIL: 'bot@x',
+        GIT_AUTHOR_DATE: '2024-01-02T00:00:00Z',
+        GIT_COMMITTER_NAME: 'Bot',
+        GIT_COMMITTER_EMAIL: 'bot@x',
+        GIT_COMMITTER_DATE: '2024-01-02T00:00:00Z',
+      },
+    });
+
+    const agg = new Aggregator();
+    await runBlamePhase(dir, ['new.txt'], agg, { followRenames: true, ignoreWhitespace: false });
+
+    const stats = agg.getStatsForTesting();
+    // With -M -C, Alice should own both lines (she wrote the content)
+    expect(stats.get('a@x')?.linesAlive).toBe(2);
+    expect(stats.get('bot@x')?.linesAlive).toBeUndefined();
   });
 });

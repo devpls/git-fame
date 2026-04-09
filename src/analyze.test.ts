@@ -65,4 +65,40 @@ describe('analyze', () => {
     const report = await analyze({ path: dir });
     expect(report.meta.durationMs).toBeGreaterThanOrEqual(0);
   });
+
+  it('excludes generated files (lock files) by default', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'hello\n', 'package-lock.json': '{"lockfileVersion":3}\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir });
+
+    const alice = report.authors.find((a) => a.email === 'a@x');
+    // Only a.txt contributes 1 line; package-lock.json is excluded
+    expect(alice?.linesAlive).toBe(1);
+    expect(report.warnings.some((w) => w.code === 'FILE_SKIPPED_GENERATED')).toBe(true);
+  });
+
+  it('includes generated files when include.generated is true', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'hello\n', 'package-lock.json': '{"lockfileVersion":3}\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, include: { generated: true } });
+
+    const alice = report.authors.find((a) => a.email === 'a@x');
+    // Both files contribute: a.txt (1 line) + package-lock.json (1 line) = 2 lines
+    expect(alice?.linesAlive).toBe(2);
+    expect(report.warnings.some((w) => w.code === 'FILE_SKIPPED_GENERATED')).toBe(false);
+  });
 });

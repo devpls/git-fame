@@ -6,11 +6,27 @@ import { runLogPhase } from './internal/pipeline/run-log-phase.js';
 import type { AnalyzeOptions } from './types/analyze-options.type.js';
 import type { Report } from './types/report.type.js';
 
+interface ResolvedDefaults {
+  includeGenerated: boolean;
+  followRenames: boolean;
+  ignoreWhitespace: boolean;
+}
+
+const resolveDefaults = (options: AnalyzeOptions): ResolvedDefaults => ({
+  includeGenerated: options.include?.generated ?? false,
+  followRenames: options.options?.followRenames ?? true,
+  // include.whitespace=true means "count whitespace lines" → do NOT ignore whitespace (no -w)
+  // include.whitespace=false (default) means "ignore whitespace" → pass -w
+  ignoreWhitespace: !(options.include?.whitespace ?? false),
+});
+
 export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
   const startedAt = new Date();
   const startMs = Date.now();
 
-  const discovered = await discover(options.path);
+  const { includeGenerated, followRenames, ignoreWhitespace } = resolveDefaults(options);
+
+  const discovered = await discover(options.path, { includeGenerated });
   const aggregator = new Aggregator();
 
   for (const warning of discovered.warnings) {
@@ -19,7 +35,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
 
   await Promise.all([
     runLogPhase(options.path, aggregator),
-    runBlamePhase(options.path, discovered.files, aggregator),
+    runBlamePhase(options.path, discovered.files, aggregator, { followRenames, ignoreWhitespace }),
   ]);
 
   const durationMs = Date.now() - startMs;
