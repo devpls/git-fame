@@ -1,1 +1,1 @@
-export { matchesUserGlobs } from './matches-user-globs.js';
+export { compileMatchers, matchesUserGlobs } from './matches-user-globs.js';

@@ -1,6 +1,6 @@
 import picomatch from 'picomatch';
 
-const makeMatchers = (patterns: readonly string[]): ((path: string) => boolean)[] =>
+export const compileMatchers = (patterns: readonly string[]): ((path: string) => boolean)[] =>
   patterns.map((p) => picomatch(p, { dot: true, matchBase: !p.includes('/') }));
 
 const matchesAny = (path: string, matchers: ((path: string) => boolean)[]): boolean =>
@@ -8,15 +8,15 @@ const matchesAny = (path: string, matchers: ((path: string) => boolean)[]): bool
 
 export const matchesUserGlobs = (
   relPath: string,
-  includeGlobs: readonly string[],
-  excludeGlobs: readonly string[],
+  includeMatchers: ((path: string) => boolean)[],
+  excludeMatchers: ((path: string) => boolean)[],
 ): boolean => {
-  if (excludeGlobs.length > 0 && matchesAny(relPath, makeMatchers(excludeGlobs))) {
+  if (excludeMatchers.length > 0 && matchesAny(relPath, excludeMatchers)) {
     return false;
   }
 
-  if (includeGlobs.length > 0) {
-    return matchesAny(relPath, makeMatchers(includeGlobs));
+  if (includeMatchers.length > 0) {
+    return matchesAny(relPath, includeMatchers);
   }
 
   return true;

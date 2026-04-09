@@ -1,8 +1,12 @@
 import { join } from 'node:path';
 import { NotAGitRepoError } from '../../errors/not-a-git-repo.error.js';
-import { isGenerated, loadGitattributes } from '../filter/is-generated/index.js';
+import {
+  compileGitattributeMatchers,
+  isGenerated,
+  loadGitattributes,
+} from '../filter/is-generated/index.js';
 import { isMinified } from '../filter/is-minified/index.js';
-import { matchesUserGlobs } from '../filter/matches-user-globs/index.js';
+import { compileMatchers, matchesUserGlobs } from '../filter/matches-user-globs/index.js';
 import type { Warning } from '../../types/warning.type.js';
 import { isBinary } from '../filter/is-binary/index.js';
 import { isGitRepo } from '../git/is-git-repo.js';
@@ -66,14 +70,17 @@ export const discover = async (cwd: string, options: DiscoverOptions): Promise<D
   const textFiles: string[] = [];
 
   const attrs = options.includeGenerated ? null : loadGitattributes(cwd);
+  const compiledAttrs = attrs !== null ? compileGitattributeMatchers(attrs) : null;
+  const includeMatchers = compileMatchers(options.includeGlobs);
+  const excludeMatchers = compileMatchers(options.excludeGlobs);
 
   for (const relPath of allFiles) {
     const absPath = join(cwd, relPath);
     try {
-      if (!matchesUserGlobs(relPath, options.includeGlobs, options.excludeGlobs)) {
+      if (!matchesUserGlobs(relPath, includeMatchers, excludeMatchers)) {
         continue;
       }
-      if (attrs !== null && isGenerated(relPath, attrs)) {
+      if (compiledAttrs !== null && isGenerated(relPath, compiledAttrs)) {
         warnings.push({
           code: 'FILE_SKIPPED_GENERATED',
           file: relPath,

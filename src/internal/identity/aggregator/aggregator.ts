@@ -84,6 +84,11 @@ export class Aggregator {
     stats.linesAlive += 1;
   }
 
+  recordBlameAuthor(name: string, mail: string): void {
+    const stats = this.getOrCreate(name, mail);
+    stats.linesAlive += 1;
+  }
+
   recordWarning(warning: Warning): void {
     this.warnings.push(warning);
   }
