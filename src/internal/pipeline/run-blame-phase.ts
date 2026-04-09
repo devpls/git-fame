@@ -53,7 +53,7 @@ export const runBlamePhase = async (
   if (files.length === 0) {
     return;
   }
-  const limit = pLimit(Math.max(1, Math.min(cpus().length, 4)));
+  const limit = pLimit(Math.min(cpus().length * 4, 32));
   let completed = 0;
   await Promise.all(
     files.map((file) =>
