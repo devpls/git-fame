@@ -6,6 +6,13 @@ import { NotAGitRepoError } from '../../errors/not-a-git-repo.error.js';
 import { buildRepo } from '../../../tests/helpers/build-repo.js';
 import { discover } from './discover.js';
 
+const defaultOpts = {
+  includeGenerated: false,
+  includeMinified: true,
+  includeGlobs: [],
+  excludeGlobs: [],
+} as const;
+
 describe('discover', () => {
   const createdRepos: string[] = [];
   afterEach(() => {
@@ -27,7 +34,7 @@ describe('discover', () => {
     ]);
     createdRepos.push(dir);
 
-    const result = await discover(dir, { includeGenerated: false });
+    const result = await discover(dir, defaultOpts);
 
     expect(result.headSha).toMatch(/^[0-9a-f]{40}$/);
     expect(result.headRef).toBe('HEAD');
@@ -62,7 +69,7 @@ describe('discover', () => {
       },
     });
 
-    const result = await discover(dir, { includeGenerated: false });
+    const result = await discover(dir, defaultOpts);
 
     expect(result.files).toEqual(['text.txt']);
     expect(result.warnings).toHaveLength(1);
@@ -72,15 +79,13 @@ describe('discover', () => {
   it('throws NotAGitRepoError for a non-git directory', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'nfd-nongit-'));
     createdRepos.push(dir);
-    await expect(discover(dir, { includeGenerated: false })).rejects.toBeInstanceOf(
-      NotAGitRepoError,
-    );
+    await expect(discover(dir, defaultOpts)).rejects.toBeInstanceOf(NotAGitRepoError);
   });
 
   it('returns an empty files list for an empty repo', async () => {
     const dir = buildRepo([]);
     createdRepos.push(dir);
-    const result = await discover(dir, { includeGenerated: false });
+    const result = await discover(dir, defaultOpts);
     expect(result.files).toEqual([]);
   });
 
@@ -94,7 +99,7 @@ describe('discover', () => {
     ]);
     createdRepos.push(dir);
 
-    const result = await discover(dir, { includeGenerated: false });
+    const result = await discover(dir, defaultOpts);
 
     expect(result.files).toEqual(['a.txt']);
     expect(result.warnings).toHaveLength(1);
@@ -111,7 +116,7 @@ describe('discover', () => {
     ]);
     createdRepos.push(dir);
 
-    const result = await discover(dir, { includeGenerated: true });
+    const result = await discover(dir, { ...defaultOpts, includeGenerated: true });
 
     expect(result.files.sort()).toEqual(['a.txt', 'package-lock.json']);
     expect(result.warnings).toEqual([]);
@@ -131,9 +136,42 @@ describe('discover', () => {
     ]);
     createdRepos.push(dir);
 
-    const result = await discover(dir, { includeGenerated: false });
+    const result = await discover(dir, defaultOpts);
 
     expect(result.files.sort()).toEqual(['.gitattributes', 'a.txt', 'package-lock.json']);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('filters out minified files when includeMinified is false', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'normal.txt': 'hello\n', 'bundle.js': 'x'.repeat(1000) },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const result = await discover(dir, { ...defaultOpts, includeMinified: false });
+
+    expect(result.files).toEqual(['normal.txt']);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]?.code).toBe('FILE_SKIPPED_MINIFIED');
+  });
+
+  it('respects user includeGlobs to narrow the file set', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'index.ts': 'const x = 1;\n', 'README.md': '# readme\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const result = await discover(dir, { ...defaultOpts, includeGlobs: ['*.ts'] });
+
+    expect(result.files).toEqual(['index.ts']);
     expect(result.warnings).toEqual([]);
   });
 });

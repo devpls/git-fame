@@ -148,4 +148,40 @@ describe('analyze', () => {
 
     expect(report.authors).toHaveLength(2);
   });
+
+  it('respects includeGlobs to filter files', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'index.ts': 'const x = 1;\n', 'README.md': '# readme\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, includeGlobs: ['*.ts'] });
+
+    const alice = report.authors.find((a) => a.email === 'a@x');
+    // Only index.ts contributes 1 line; README.md is excluded by glob
+    expect(alice?.linesAlive).toBe(1);
+    expect(report.warnings.some((w) => w.code === 'FILE_SKIPPED_GENERATED')).toBe(false);
+  });
+
+  it('excludes minified files when include.minified is false', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'normal.txt': 'hello\n', 'bundle.js': 'x'.repeat(1000) },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, include: { minified: false } });
+
+    const alice = report.authors.find((a) => a.email === 'a@x');
+    // Only normal.txt contributes 1 line; bundle.js is excluded as minified
+    expect(alice?.linesAlive).toBe(1);
+    expect(report.warnings.some((w) => w.code === 'FILE_SKIPPED_MINIFIED')).toBe(true);
+  });
 });

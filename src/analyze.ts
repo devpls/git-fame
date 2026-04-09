@@ -9,28 +9,46 @@ import type { Report } from './types/report.type.js';
 
 interface ResolvedDefaults {
   includeGenerated: boolean;
+  includeMinified: boolean;
   followRenames: boolean;
   ignoreWhitespace: boolean;
   applyMailmap: boolean;
+  includeGlobs: string[];
+  excludeGlobs: string[];
 }
 
 const resolveDefaults = (options: AnalyzeOptions): ResolvedDefaults => ({
   includeGenerated: options.include?.generated ?? false,
+  includeMinified: options.include?.minified ?? true,
   followRenames: options.options?.followRenames ?? true,
   // include.whitespace=true means "count whitespace lines" → do NOT ignore whitespace (no -w)
   // include.whitespace=false (default) means "ignore whitespace" → pass -w
   ignoreWhitespace: !(options.include?.whitespace ?? false),
   applyMailmap: options.options?.applyMailmap ?? true,
+  includeGlobs: options.includeGlobs ?? [],
+  excludeGlobs: options.excludeGlobs ?? [],
 });
 
 export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
   const startedAt = new Date();
   const startMs = Date.now();
 
-  const { includeGenerated, followRenames, ignoreWhitespace, applyMailmap } =
-    resolveDefaults(options);
+  const {
+    includeGenerated,
+    includeMinified,
+    followRenames,
+    ignoreWhitespace,
+    applyMailmap,
+    includeGlobs,
+    excludeGlobs,
+  } = resolveDefaults(options);
 
-  const discovered = await discover(options.path, { includeGenerated });
+  const discovered = await discover(options.path, {
+    includeGenerated,
+    includeMinified,
+    includeGlobs,
+    excludeGlobs,
+  });
   const mailmap = applyMailmap ? loadMailmap(options.path) : undefined;
   const aggregator = new Aggregator(mailmap);
 

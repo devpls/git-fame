@@ -1,6 +1,8 @@
 import { join } from 'node:path';
 import { NotAGitRepoError } from '../../errors/not-a-git-repo.error.js';
 import { isGenerated, loadGitattributes } from '../filter/is-generated/index.js';
+import { isMinified } from '../filter/is-minified/index.js';
+import { matchesUserGlobs } from '../filter/matches-user-globs/index.js';
 import type { Warning } from '../../types/warning.type.js';
 import { isBinary } from '../filter/is-binary/index.js';
 import { isGitRepo } from '../git/is-git-repo.js';
@@ -9,6 +11,9 @@ import { resolveRev } from '../git/resolve-rev.js';
 
 export interface DiscoverOptions {
   includeGenerated: boolean;
+  includeMinified: boolean;
+  includeGlobs: readonly string[];
+  excludeGlobs: readonly string[];
 }
 
 export interface DiscoverResult {
@@ -33,6 +38,9 @@ export const discover = async (cwd: string, options: DiscoverOptions): Promise<D
   for (const relPath of allFiles) {
     const absPath = join(cwd, relPath);
     try {
+      if (!matchesUserGlobs(relPath, options.includeGlobs, options.excludeGlobs)) {
+        continue;
+      }
       if (attrs !== null && isGenerated(relPath, attrs)) {
         warnings.push({
           code: 'FILE_SKIPPED_GENERATED',
@@ -46,6 +54,14 @@ export const discover = async (cwd: string, options: DiscoverOptions): Promise<D
           code: 'FILE_SKIPPED_BINARY',
           file: relPath,
           message: `${relPath} is binary; excluded from analysis`,
+        });
+        continue;
+      }
+      if (!options.includeMinified && isMinified(absPath)) {
+        warnings.push({
+          code: 'FILE_SKIPPED_MINIFIED',
+          file: relPath,
+          message: `${relPath} is minified; excluded from analysis`,
         });
         continue;
       }
