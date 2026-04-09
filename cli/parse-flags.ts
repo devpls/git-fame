@@ -1,9 +1,11 @@
 import { Command } from 'commander';
 import type { AnalyzeOptions } from '../src/types/analyze-options.type.js';
+import type { RenderOptions, SortableColumn } from '../src/render/index.js';
 
 export interface ParsedFlags {
   options: AnalyzeOptions;
   format: string;
+  renderOptions: RenderOptions;
 }
 
 export const parseFlags = (argv: string[]): ParsedFlags => {
@@ -21,6 +23,12 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
     .option('--include-globs <patterns...>', 'Only analyze files matching these glob patterns')
     .option('--exclude-globs <patterns...>', 'Exclude files matching these glob patterns')
     .option('--format <format>', 'Output format (table)', 'table')
+    .option(
+      '--sort <column>',
+      'Sort by column (linesAlive, linesAdded, linesDeleted, commits, files)',
+      'linesAlive',
+    )
+    .option('--limit <n>', 'Show only top N authors', parseInt)
     .option('--rev <ref>', 'Analyze at a specific commit, tag, or branch')
     .option('--from <ref>', 'Start of commit range (used with --to)')
     .option('--to <ref>', 'End of commit range (used with --from)')
@@ -74,5 +82,11 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   return {
     options: analyzeOptions,
     format: opts.format as string,
+    renderOptions: {
+      sort: { by: opts.sort as SortableColumn, order: 'desc' as const },
+      ...(opts.limit !== undefined && !isNaN(opts.limit as number)
+        ? { limit: opts.limit as number }
+        : {}),
+    },
   };
 };

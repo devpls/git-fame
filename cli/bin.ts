@@ -6,9 +6,9 @@ import type { RenderFormat } from '../src/render/index.js';
 import { parseFlags } from './parse-flags.js';
 
 const main = async (): Promise<void> => {
-  const { options, format } = parseFlags(process.argv);
+  const { options, format, renderOptions } = parseFlags(process.argv);
   const report = await analyze(options);
-  const output = render(report, format as RenderFormat);
+  const output = render(report, format as RenderFormat, renderOptions);
   process.stdout.write(output + '\n');
 };
 

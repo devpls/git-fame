@@ -78,4 +78,14 @@ describe('parseFlags', () => {
     const { options } = parseFlags([...base, '--from', 'v1']);
     expect(options.range).toBeUndefined();
   });
+
+  it('passes --sort as renderOptions.sort.by', () => {
+    const { renderOptions } = parseFlags([...base, '--sort', 'commits']);
+    expect(renderOptions.sort?.by).toBe('commits');
+  });
+
+  it('passes --limit as renderOptions.limit', () => {
+    const { renderOptions } = parseFlags([...base, '--limit', '5']);
+    expect(renderOptions.limit).toBe(5);
+  });
 });
