@@ -101,4 +101,51 @@ describe('analyze', () => {
     expect(alice?.linesAlive).toBe(2);
     expect(report.warnings.some((w) => w.code === 'FILE_SKIPPED_GENERATED')).toBe(false);
   });
+
+  it('merges identities via .mailmap by default', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice Old <alice@old>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'line one\n' },
+      },
+      {
+        author: 'Alice New <alice@new>',
+        date: '2024-01-02T00:00:00Z',
+        files: {
+          'b.txt': 'line two\n',
+          '.mailmap': 'Alice New <alice@new> <alice@old>\n',
+        },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir });
+
+    expect(report.authors).toHaveLength(1);
+    expect(report.authors[0]?.email).toBe('alice@new');
+  });
+
+  it('does not apply mailmap when options.applyMailmap is false', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice Old <alice@old>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'line one\n' },
+      },
+      {
+        author: 'Alice New <alice@new>',
+        date: '2024-01-02T00:00:00Z',
+        files: {
+          'b.txt': 'line two\n',
+          '.mailmap': 'Alice New <alice@new> <alice@old>\n',
+        },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, options: { applyMailmap: false } });
+
+    expect(report.authors).toHaveLength(2);
+  });
 });

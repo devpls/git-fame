@@ -1,4 +1,5 @@
 import { Aggregator } from './internal/identity/aggregator/index.js';
+import { loadMailmap } from './internal/identity/mailmap/index.js';
 import { assembleReport } from './internal/pipeline/assemble-report.js';
 import { discover } from './internal/pipeline/discover.js';
 import { runBlamePhase } from './internal/pipeline/run-blame-phase.js';
@@ -10,6 +11,7 @@ interface ResolvedDefaults {
   includeGenerated: boolean;
   followRenames: boolean;
   ignoreWhitespace: boolean;
+  applyMailmap: boolean;
 }
 
 const resolveDefaults = (options: AnalyzeOptions): ResolvedDefaults => ({
@@ -18,16 +20,19 @@ const resolveDefaults = (options: AnalyzeOptions): ResolvedDefaults => ({
   // include.whitespace=true means "count whitespace lines" → do NOT ignore whitespace (no -w)
   // include.whitespace=false (default) means "ignore whitespace" → pass -w
   ignoreWhitespace: !(options.include?.whitespace ?? false),
+  applyMailmap: options.options?.applyMailmap ?? true,
 });
 
 export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
   const startedAt = new Date();
   const startMs = Date.now();
 
-  const { includeGenerated, followRenames, ignoreWhitespace } = resolveDefaults(options);
+  const { includeGenerated, followRenames, ignoreWhitespace, applyMailmap } =
+    resolveDefaults(options);
 
   const discovered = await discover(options.path, { includeGenerated });
-  const aggregator = new Aggregator();
+  const mailmap = applyMailmap ? loadMailmap(options.path) : undefined;
+  const aggregator = new Aggregator(mailmap);
 
   for (const warning of discovered.warnings) {
     aggregator.recordWarning(warning);
