@@ -349,6 +349,46 @@ describe('analyze', () => {
     expect(libAuthor).toBeUndefined();
   });
 
+  it('returns cached result on second call with same options', async () => {
+    const dir = buildRepo([
+      { author: 'Alice <a@x>', date: '2024-01-01T00:00:00Z', files: { 'a.txt': 'hello\n' } },
+    ]);
+    createdRepos.push(dir);
+
+    const first = await analyze({ path: dir });
+    expect(first.meta.cached).toBe(false);
+
+    const second = await analyze({ path: dir });
+    expect(second.meta.cached).toBe(true);
+    expect(second.authors).toEqual(first.authors);
+    expect(second.repo.headSha).toBe(first.repo.headSha);
+  });
+
+  it('skips cache when cache: false', async () => {
+    const dir = buildRepo([
+      { author: 'Alice <a@x>', date: '2024-01-01T00:00:00Z', files: { 'a.txt': 'hello\n' } },
+    ]);
+    createdRepos.push(dir);
+
+    await analyze({ path: dir });
+    const second = await analyze({ path: dir, cache: false });
+    expect(second.meta.cached).toBe(false);
+  });
+
+  it('skips cache on dirty worktree', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const dir = buildRepo([
+      { author: 'Alice <a@x>', date: '2024-01-01T00:00:00Z', files: { 'a.txt': 'hello\n' } },
+    ]);
+    createdRepos.push(dir);
+
+    await analyze({ path: dir });
+    writeFileSync(join(dir, 'a.txt'), 'modified\n', 'utf8');
+    const second = await analyze({ path: dir });
+    expect(second.meta.cached).toBe(false);
+  });
+
   it('works in detached HEAD state', async () => {
     const dir = buildRepo([
       {

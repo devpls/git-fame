@@ -36,6 +36,8 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
     .option('--to <ref>', 'End of commit range (used with --from)')
     .option('--since <date>', 'Only count log entries after this date (ISO 8601)')
     .option('--until <date>', 'Only count log entries before this date (ISO 8601)')
+    .option('--concurrency <n>', 'Number of parallel blame workers (default: cpus * 1.2)', parseInt)
+    .option('--no-cache', 'Disable result caching')
     .option('--submodules', 'Walk into submodules')
     .option('--split-submodules', 'Output separate reports per submodule (implies --submodules)')
     .option('--recursive', 'Analyze all git repos in subdirectories')
@@ -87,6 +89,15 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   const submodules = (opts.submodules as boolean | undefined) ?? false;
   const splitSubmodules = (opts.splitSubmodules as boolean | undefined) ?? false;
   const recursive = (opts.recursive as boolean | undefined) ?? false;
+
+  if (
+    (opts.concurrency as number | undefined) !== undefined &&
+    !isNaN(opts.concurrency as number)
+  ) {
+    analyzeOptions.concurrency = opts.concurrency as number;
+  }
+
+  analyzeOptions.cache = opts.cache as boolean;
 
   if (submodules || splitSubmodules) {
     analyzeOptions.submodules = true;

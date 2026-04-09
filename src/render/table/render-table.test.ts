@@ -7,6 +7,7 @@ const makeReport = (overrides: Partial<Report> = {}): Report => ({
     version: '0.1.0',
     generatedAt: new Date('2024-01-01T00:00:00Z'),
     durationMs: 100,
+    cached: false,
   },
   repo: {
     path: '/tmp/repo',

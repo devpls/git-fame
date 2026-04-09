@@ -3,7 +3,12 @@ import type { Report } from '../../types/report.type.js';
 import { renderJson } from './render-json.js';
 
 const makeReport = (overrides: Partial<Report> = {}): Report => ({
-  meta: { version: '0.1.0', generatedAt: new Date('2024-01-01T00:00:00Z'), durationMs: 100 },
+  meta: {
+    version: '0.1.0',
+    generatedAt: new Date('2024-01-01T00:00:00Z'),
+    durationMs: 100,
+    cached: false,
+  },
   repo: {
     path: '/tmp/repo',
     headSha: 'a'.repeat(40),

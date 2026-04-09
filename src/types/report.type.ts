@@ -6,6 +6,7 @@ export interface Report {
     version: string;
     generatedAt: Date;
     durationMs: number;
+    cached: boolean;
   };
   repo: {
     path: string;
