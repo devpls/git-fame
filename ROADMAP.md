@@ -6,6 +6,12 @@ the design spec at `docs/superpowers/specs/2026-04-08-node-fame-design.md`.
 
 ## Post-v0.1.0 backlog
 
+- **libgit2-wasm blame (v0.2.0 priority).** Compile libgit2's blame API to
+  WebAssembly via Emscripten. Eliminates the ~2800 subprocess spawns that
+  dominate execution time. Cross-platform (no native build), ships as a
+  `.wasm` file in the npm package. Expected 5-10x speedup over the current
+  subprocess approach. Profiling shows 76% of wall-clock time is in git
+  blame subprocesses; the remaining 24% is Node overhead.
 - **Worker threads for blame parsing.** Move porcelain parsing to a
   `worker_threads` pool. Triggered if profiling shows the single-threaded
   parser is the bottleneck on repos in the 50k+ file range.
