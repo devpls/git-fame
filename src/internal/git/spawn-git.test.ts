@@ -41,15 +41,12 @@ describe('spawnGit', () => {
 
   it('rejects done with AbortError when signal aborts mid-execution', async () => {
     const controller = new AbortController();
-    const result = spawnGit(
-      ['log', '--all', '--pretty=format:%H'],
-      process.cwd(),
-      controller.signal,
-    );
+    // git hash-object --stdin blocks indefinitely on stdin — guaranteed alive when abort fires
+    const result = spawnGit(['hash-object', '--stdin'], process.cwd(), controller.signal);
     result.stdout.resume();
-    setTimeout(() => {
+    queueMicrotask(() => {
       controller.abort();
-    }, 10);
+    });
     await expect(result.done).rejects.toBeInstanceOf(AbortError);
   });
 
