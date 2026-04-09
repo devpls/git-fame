@@ -1,15 +1,21 @@
 #!/usr/bin/env node
+import { CommanderError } from 'commander';
 import { analyze } from '../src/analyze.js';
 import { render } from '../src/render/index.js';
+import type { RenderFormat } from '../src/render/index.js';
+import { parseFlags } from './parse-flags.js';
 
 const main = async (): Promise<void> => {
-  const path = process.argv[2] ?? process.cwd();
-  const report = await analyze({ path });
-  const output = render(report, 'table');
+  const { options, format } = parseFlags(process.argv);
+  const report = await analyze(options);
+  const output = render(report, format as RenderFormat);
   process.stdout.write(output + '\n');
 };
 
 main().catch((err: unknown) => {
+  if (err instanceof CommanderError) {
+    process.exit(err.exitCode);
+  }
   const message = err instanceof Error ? err.message : String(err);
   process.stderr.write(`node-fame: ${message}\n`);
   process.exit(1);
