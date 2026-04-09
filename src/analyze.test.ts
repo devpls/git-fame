@@ -1,6 +1,8 @@
 import { rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import { analyze } from './analyze.js';
+import { ConflictingOptionsError } from './errors/conflicting-options.error.js';
 import { buildRepo } from '../tests/helpers/build-repo.js';
 
 describe('analyze', () => {
@@ -183,5 +185,131 @@ describe('analyze', () => {
     // Only normal.txt contributes 1 line; bundle.js is excluded as minified
     expect(alice?.linesAlive).toBe(1);
     expect(report.warnings.some((w) => w.code === 'FILE_SKIPPED_MINIFIED')).toBe(true);
+  });
+
+  it('throws ConflictingOptionsError when both rev and range are provided', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'hi\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    await expect(
+      analyze({ path: dir, rev: 'HEAD', range: { from: 'HEAD~1', to: 'HEAD' } }),
+    ).rejects.toBeInstanceOf(ConflictingOptionsError);
+  });
+
+  it('analyzes at a specific tag with rev option', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'first line\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    // Tag the first commit as v1 before adding Bob's commit
+    spawnSync('git', ['tag', 'v1'], { cwd: dir });
+
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(`${dir}/a.txt`, 'first line\nBob line\n', 'utf8');
+    spawnSync('git', ['add', 'a.txt'], { cwd: dir });
+    spawnSync('git', ['commit', '-m', 'bob adds line'], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Bob',
+        GIT_AUTHOR_EMAIL: 'b@x',
+        GIT_AUTHOR_DATE: '2024-01-02T00:00:00Z',
+        GIT_COMMITTER_NAME: 'Bob',
+        GIT_COMMITTER_EMAIL: 'b@x',
+        GIT_COMMITTER_DATE: '2024-01-02T00:00:00Z',
+      },
+    });
+
+    const report = await analyze({ path: dir, rev: 'v1' });
+
+    // headRef should be 'v1' — we analyzed at the tag, not HEAD
+    expect(report.repo.headRef).toBe('v1');
+    // Blame at v1: only Alice's line exists (file had only 1 line at v1)
+    const alice = report.authors.find((a) => a.email === 'a@x');
+    expect(alice?.linesAlive).toBe(1);
+    // Bob has no alive lines at v1 (his commit came after)
+    expect(report.authors.find((a) => a.email === 'b@x')?.linesAlive).toBe(0);
+  });
+
+  it('counts only commits in range for linesAdded', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'first\n' },
+      },
+      {
+        author: 'Bob <b@x>',
+        date: '2024-01-02T00:00:00Z',
+        files: { 'b.txt': 'middle\n' },
+      },
+      {
+        author: 'Carol <c@x>',
+        date: '2024-01-03T00:00:00Z',
+        files: { 'c.txt': 'last\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const logResult = spawnSync('git', ['log', '--format=%H', '--reverse'], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    const shas = logResult.stdout.trim().split('\n');
+    const firstSha = shas[0] ?? '';
+    const secondSha = shas[1] ?? '';
+    spawnSync('git', ['tag', 'v1', firstSha], { cwd: dir });
+    spawnSync('git', ['tag', 'v2', secondSha], { cwd: dir });
+
+    const report = await analyze({ path: dir, range: { from: 'v1', to: 'v2' } });
+
+    // Only Bob's commit is in range v1..v2
+    const bob = report.authors.find((a) => a.email === 'b@x');
+    expect(bob?.linesAdded).toBe(1);
+    // Alice has blame lines at v2 (her file exists) but no log commits in range → linesAdded=0
+    expect(report.authors.find((a) => a.email === 'a@x')?.linesAdded).toBe(0);
+    // Carol's file doesn't exist at v2 (her commit is after v2), so she's not in the report at all
+    expect(report.authors.find((a) => a.email === 'c@x')).toBeUndefined();
+    expect(report.repo.range).toEqual({
+      fromSha: firstSha,
+      toSha: secondSha,
+      fromRef: 'v1',
+      toRef: 'v2',
+    });
+  });
+
+  it('filters log by since date', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'old\n' },
+      },
+      {
+        author: 'Bob <b@x>',
+        date: '2024-06-01T00:00:00Z',
+        files: { 'b.txt': 'new\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, since: new Date('2024-03-01T00:00:00Z') });
+
+    // Alice's commit predates the since cutoff — she has linesAdded=0 (blame still counts her lines alive)
+    expect(report.authors.find((a) => a.email === 'a@x')?.linesAdded).toBe(0);
+    // Bob's commit is after the cutoff, so his linesAdded is counted
+    const bob = report.authors.find((a) => a.email === 'b@x');
+    expect(bob?.linesAdded).toBe(1);
   });
 });

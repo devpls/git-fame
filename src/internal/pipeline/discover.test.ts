@@ -174,4 +174,75 @@ describe('discover', () => {
     expect(result.files).toEqual(['index.ts']);
     expect(result.warnings).toEqual([]);
   });
+
+  it('resolves a tag name as the analysis target', async () => {
+    const { spawnSync } = await import('node:child_process');
+
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'first\n' },
+      },
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-02T00:00:00Z',
+        files: { 'a.txt': 'second\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    // Tag the first commit
+    const logResult = spawnSync('git', ['log', '--format=%H', '--reverse'], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    const firstSha = logResult.stdout.trim().split('\n')[0] ?? '';
+    spawnSync('git', ['tag', 'v1', firstSha], { cwd: dir });
+
+    const result = await discover(dir, { ...defaultOpts, rev: 'v1' });
+
+    expect(result.headSha).toBe(firstSha);
+    expect(result.headRef).toBe('v1');
+    expect(result.range).toBeUndefined();
+  });
+
+  it('resolves a range and returns both endpoints', async () => {
+    const { spawnSync } = await import('node:child_process');
+
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'first\n' },
+      },
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-02T00:00:00Z',
+        files: { 'a.txt': 'second\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const logResult = spawnSync('git', ['log', '--format=%H', '--reverse'], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    const shas = logResult.stdout.trim().split('\n');
+    const firstSha = shas[0] ?? '';
+    const secondSha = shas[1] ?? '';
+    spawnSync('git', ['tag', 'v1', firstSha], { cwd: dir });
+    spawnSync('git', ['tag', 'v2', secondSha], { cwd: dir });
+
+    const result = await discover(dir, { ...defaultOpts, range: { from: 'v1', to: 'v2' } });
+
+    expect(result.headSha).toBe(secondSha);
+    expect(result.headRef).toBe('v2');
+    expect(result.range).toEqual({
+      fromSha: firstSha,
+      toSha: secondSha,
+      fromRef: 'v1',
+      toRef: 'v2',
+    });
+  });
 });

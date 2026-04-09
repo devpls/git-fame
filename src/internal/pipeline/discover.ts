@@ -7,6 +7,7 @@ import type { Warning } from '../../types/warning.type.js';
 import { isBinary } from '../filter/is-binary/index.js';
 import { isGitRepo } from '../git/is-git-repo.js';
 import { listTrackedFiles } from '../git/list-tracked-files.js';
+import { resolveRange } from '../git/resolve-range.js';
 import { resolveRev } from '../git/resolve-rev.js';
 
 export interface DiscoverOptions {
@@ -14,6 +15,8 @@ export interface DiscoverOptions {
   includeMinified: boolean;
   includeGlobs: readonly string[];
   excludeGlobs: readonly string[];
+  rev?: string;
+  range?: { from: string; to: string };
 }
 
 export interface DiscoverResult {
@@ -21,6 +24,12 @@ export interface DiscoverResult {
   headRef: string;
   files: string[];
   warnings: Warning[];
+  range?: {
+    fromSha: string;
+    toSha: string;
+    fromRef: string;
+    toRef: string;
+  };
 }
 
 export const discover = async (cwd: string, options: DiscoverOptions): Promise<DiscoverResult> => {
@@ -28,7 +37,30 @@ export const discover = async (cwd: string, options: DiscoverOptions): Promise<D
     throw new NotAGitRepoError(cwd);
   }
 
-  const headSha = await resolveRev(cwd, 'HEAD').catch(() => '');
+  let headSha: string;
+  let headRef: string;
+  let resolvedRange: DiscoverResult['range'];
+
+  if (options.range !== undefined) {
+    const { fromSha, toSha } = await resolveRange(cwd, options.range).catch(() => ({
+      fromSha: '',
+      toSha: '',
+    }));
+    headSha = toSha;
+    headRef = options.range.to;
+    resolvedRange = {
+      fromSha,
+      toSha,
+      fromRef: options.range.from,
+      toRef: options.range.to,
+    };
+  } else {
+    const ref = options.rev ?? 'HEAD';
+    headSha = await resolveRev(cwd, ref).catch(() => '');
+    headRef = ref;
+    resolvedRange = undefined;
+  }
+
   const allFiles = await listTrackedFiles(cwd);
   const warnings: Warning[] = [];
   const textFiles: string[] = [];
@@ -73,8 +105,9 @@ export const discover = async (cwd: string, options: DiscoverOptions): Promise<D
 
   return {
     headSha,
-    headRef: 'HEAD',
+    headRef,
     files: textFiles,
     warnings,
+    ...(resolvedRange !== undefined && { range: resolvedRange }),
   };
 };

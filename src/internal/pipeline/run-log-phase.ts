@@ -2,15 +2,37 @@ import { spawnGit } from '../git/spawn-git.js';
 import { parseLogNumstat } from '../parse/parse-log-numstat/index.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
 
-const LOG_ARGS = [
+export interface LogPhaseOptions {
+  range?: { fromSha: string; toSha: string };
+  since?: Date;
+  until?: Date;
+}
+
+const LOG_BASE_ARGS = [
   'log',
   '--no-merges',
   '--pretty=format:%H%x00%an%x00%ae%x00%at',
   '--numstat',
 ] as const;
 
-export const runLogPhase = async (cwd: string, aggregator: Aggregator): Promise<void> => {
-  const result = spawnGit([...LOG_ARGS], cwd);
+export const runLogPhase = async (
+  cwd: string,
+  aggregator: Aggregator,
+  options?: LogPhaseOptions,
+): Promise<void> => {
+  const args: string[] = [...LOG_BASE_ARGS];
+
+  if (options?.since !== undefined) {
+    args.push(`--since=${options.since.toISOString()}`);
+  }
+  if (options?.until !== undefined) {
+    args.push(`--until=${options.until.toISOString()}`);
+  }
+  if (options?.range !== undefined) {
+    args.push(`${options.range.fromSha}..${options.range.toSha}`);
+  }
+
+  const result = spawnGit(args, cwd);
 
   const consume = async (): Promise<void> => {
     for await (const commit of parseLogNumstat(result.stdout)) {

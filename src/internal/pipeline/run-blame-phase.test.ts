@@ -28,6 +28,7 @@ describe('runBlamePhase', () => {
 
     const agg = new Aggregator();
     await runBlamePhase(dir, ['a.txt', 'b.txt'], agg, {
+      rev: 'HEAD',
       followRenames: true,
       ignoreWhitespace: true,
     });
@@ -52,7 +53,11 @@ describe('runBlamePhase', () => {
     createdRepos.push(dir);
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, ['a.txt'], agg, { followRenames: true, ignoreWhitespace: true });
+    await runBlamePhase(dir, ['a.txt'], agg, {
+      rev: 'HEAD',
+      followRenames: true,
+      ignoreWhitespace: true,
+    });
 
     const stats = agg.getStatsForTesting();
     expect(stats.get('a@x')?.linesAlive).toBe(1);
@@ -71,6 +76,7 @@ describe('runBlamePhase', () => {
 
     const agg = new Aggregator();
     await runBlamePhase(dir, ['a.txt', 'does-not-exist.txt'], agg, {
+      rev: 'HEAD',
       followRenames: true,
       ignoreWhitespace: true,
     });
@@ -91,7 +97,7 @@ describe('runBlamePhase', () => {
     createdRepos.push(dir);
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, [], agg, { followRenames: true, ignoreWhitespace: true });
+    await runBlamePhase(dir, [], agg, { rev: 'HEAD', followRenames: true, ignoreWhitespace: true });
     expect(agg.getStatsForTesting().size).toBe(0);
   });
 
@@ -124,7 +130,11 @@ describe('runBlamePhase', () => {
     });
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, ['a.txt'], agg, { followRenames: false, ignoreWhitespace: true });
+    await runBlamePhase(dir, ['a.txt'], agg, {
+      rev: 'HEAD',
+      followRenames: false,
+      ignoreWhitespace: true,
+    });
 
     const stats = agg.getStatsForTesting();
     // With -w, Alice should still own all 3 lines
@@ -161,7 +171,11 @@ describe('runBlamePhase', () => {
     });
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, ['a.txt'], agg, { followRenames: false, ignoreWhitespace: false });
+    await runBlamePhase(dir, ['a.txt'], agg, {
+      rev: 'HEAD',
+      followRenames: false,
+      ignoreWhitespace: false,
+    });
 
     const stats = agg.getStatsForTesting();
     // Without -w, Bot owns the indentation-changed line (only "  return 1;" changed to "    return 1;")
@@ -197,11 +211,59 @@ describe('runBlamePhase', () => {
     });
 
     const agg = new Aggregator();
-    await runBlamePhase(dir, ['new.txt'], agg, { followRenames: true, ignoreWhitespace: false });
+    await runBlamePhase(dir, ['new.txt'], agg, {
+      rev: 'HEAD',
+      followRenames: true,
+      ignoreWhitespace: false,
+    });
 
     const stats = agg.getStatsForTesting();
     // With -M -C, Alice should own both lines (she wrote the content)
     expect(stats.get('a@x')?.linesAlive).toBe(2);
     expect(stats.get('bot@x')?.linesAlive).toBeUndefined();
+  });
+
+  it('blames at a specific tag revision', async () => {
+    const { spawnSync } = await import('node:child_process');
+
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.txt': 'first line\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    // Tag first commit as v1
+    spawnSync('git', ['tag', 'v1'], { cwd: dir });
+
+    // Make a second commit by Bob
+    writeFileSync(join(dir, 'a.txt'), 'first line\nsecond line\n', 'utf8');
+    spawnSync('git', ['add', 'a.txt'], { cwd: dir });
+    spawnSync('git', ['commit', '-m', 'add second line'], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Bob',
+        GIT_AUTHOR_EMAIL: 'b@x',
+        GIT_AUTHOR_DATE: '2024-01-02T00:00:00Z',
+        GIT_COMMITTER_NAME: 'Bob',
+        GIT_COMMITTER_EMAIL: 'b@x',
+        GIT_COMMITTER_DATE: '2024-01-02T00:00:00Z',
+      },
+    });
+
+    const agg = new Aggregator();
+    // Blame at v1 — only the first commit's state exists there
+    await runBlamePhase(dir, ['a.txt'], agg, {
+      rev: 'v1',
+      followRenames: false,
+      ignoreWhitespace: false,
+    });
+
+    const stats = agg.getStatsForTesting();
+    expect(stats.get('a@x')?.linesAlive).toBe(1);
+    expect(stats.has('b@x')).toBe(false);
   });
 });

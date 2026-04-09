@@ -5,6 +5,7 @@ import { parseBlamePorcelain } from '../parse/parse-blame-porcelain/index.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
 
 export interface BlameOptions {
+  rev: string;
   followRenames: boolean;
   ignoreWhitespace: boolean;
 }
@@ -16,7 +17,7 @@ const blameOneFile = async (
   options: BlameOptions,
 ): Promise<void> => {
   try {
-    const args = ['blame', '--line-porcelain', 'HEAD'];
+    const args = ['blame', '--line-porcelain', options.rev];
     if (options.followRenames) {
       args.push('-M', '-C');
     }

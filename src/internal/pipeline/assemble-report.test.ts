@@ -24,4 +24,21 @@ describe('assembleReport', () => {
     expect(report.authors).toEqual([]);
     expect(report.warnings).toEqual([]);
   });
+
+  it('includes range in the report when supplied in context', () => {
+    const agg = new Aggregator();
+    const start = new Date('2024-02-01T00:00:00Z');
+    const fromSha = 'a'.repeat(40);
+    const toSha = 'b'.repeat(40);
+    const report = assembleReport(agg, {
+      path: '/tmp/repo',
+      headSha: toSha,
+      headRef: 'v2',
+      startedAt: start,
+      durationMs: 50,
+      range: { fromSha, toSha, fromRef: 'v1', toRef: 'v2' },
+    });
+
+    expect(report.repo.range).toEqual({ fromSha, toSha, fromRef: 'v1', toRef: 'v2' });
+  });
 });

@@ -9,6 +9,12 @@ export interface AssembleContext {
   headRef: string;
   startedAt: Date;
   durationMs: number;
+  range?: {
+    fromSha: string;
+    toSha: string;
+    fromRef: string;
+    toRef: string;
+  };
 }
 
 export const assembleReport = (aggregator: Aggregator, ctx: AssembleContext): Report =>
@@ -22,6 +28,7 @@ export const assembleReport = (aggregator: Aggregator, ctx: AssembleContext): Re
       path: ctx.path,
       headSha: ctx.headSha,
       headRef: ctx.headRef,
+      ...(ctx.range !== undefined && { range: ctx.range }),
       totals: { lines: 0, commits: 0, files: 0 },
     },
   );
