@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { computeGroupKey } from './compute-group-key.js';
 import { countBlameLines } from './count-blame-lines.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
 
@@ -34,6 +35,7 @@ export const createBlameWorker = (
   cwd: string,
   aggregator: Aggregator,
   options: BlameWorkerOptions,
+  groupBy?: { type: 'extension' | 'directory'; depth: number },
 ): BlameWorker => {
   const blameCmd = buildBlameCommand(options.rev, options.followRenames, options.ignoreWhitespace);
 
@@ -67,7 +69,11 @@ export const createBlameWorker = (
         });
       } else {
         try {
-          countBlameLines(blameOutput, aggregator);
+          const gk = groupBy !== undefined ? computeGroupKey(currentFile, groupBy) : undefined;
+          countBlameLines(blameOutput, aggregator, gk);
+          if (gk !== undefined) {
+            aggregator.recordFileGroup(gk, currentFile);
+          }
         } catch {
           aggregator.recordWarning({
             code: 'BLAME_FAILED',

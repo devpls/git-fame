@@ -23,6 +23,7 @@ export const runBlamePhase = async (
   options: BlameOptions,
   onProgress?: (event: ProgressEvent) => void,
   concurrency?: number,
+  groupBy?: { type: 'extension' | 'directory'; depth: number },
 ): Promise<void> => {
   if (files.length === 0) {
     return;
@@ -30,7 +31,7 @@ export const runBlamePhase = async (
 
   const workerCount = resolveWorkerCount(concurrency, files.length);
   const workers = Array.from({ length: workerCount }, () =>
-    createBlameWorker(cwd, aggregator, options),
+    createBlameWorker(cwd, aggregator, options, groupBy),
   );
 
   let nextIdx = 0;

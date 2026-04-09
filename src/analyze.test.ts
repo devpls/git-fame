@@ -432,4 +432,44 @@ describe('analyze', () => {
     const totalLinesAlive = report.authors.reduce((sum, a) => sum + a.linesAlive, 0);
     expect(totalLinesAlive).toBe(0);
   });
+
+  it('populates breakdown when groupBy extension is set', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.ts': 'line\n', 'b.css': 'style\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, groupBy: { type: 'extension', depth: 0 } });
+    expect(report.breakdown).toBeDefined();
+    expect(report.breakdown!.length).toBeGreaterThanOrEqual(2);
+
+    const tsEntry = report.breakdown!.find((e) => e.group === '.ts');
+    expect(tsEntry?.linesAlive).toBe(1);
+    expect(tsEntry?.files).toBe(1);
+  });
+
+  it('populates breakdown when groupBy directory depth 1 is set', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'src/a.ts': 'line\n', 'cli/b.ts': 'line\n', 'root.txt': 'line\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, groupBy: { type: 'directory', depth: 1 } });
+    expect(report.breakdown).toBeDefined();
+
+    const srcEntry = report.breakdown!.find((e) => e.group === 'src');
+    const cliEntry = report.breakdown!.find((e) => e.group === 'cli');
+    const rootEntry = report.breakdown!.find((e) => e.group === '(root)');
+    expect(srcEntry?.linesAlive).toBe(1);
+    expect(cliEntry?.linesAlive).toBe(1);
+    expect(rootEntry?.linesAlive).toBe(1);
+  });
 });

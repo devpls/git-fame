@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 import cliProgress from 'cli-progress';
-import { CommanderError } from 'commander';
 import { analyze } from '../src/analyze.js';
 import { analyzeMany } from '../src/analyze-many.js';
-import { render } from '../src/render/index.js';
+import { render, renderBreakdown } from '../src/render/index.js';
 import type { RenderFormat } from '../src/render/index.js';
 import type { AnalyzeManyOptions } from '../src/types/analyze-many-options.type.js';
 import type { ProgressEvent } from '../src/types/progress-event.type.js';
 import { parseFlags } from './parse-flags.js';
 
 const main = async (): Promise<void> => {
-  const { options, format, renderOptions, recursive, splitSubmodules } = parseFlags(process.argv);
+  const { options, format, renderOptions, recursive, splitSubmodules, perAuthor } = parseFlags(
+    process.argv,
+  );
   const needsMany = recursive || splitSubmodules;
 
   // Wire progress bar only on TTY
@@ -45,13 +46,17 @@ const main = async (): Promise<void> => {
     // progress bar already wired via onProgress
     const output = render(report, format as RenderFormat, renderOptions);
     process.stdout.write(output + '\n');
+
+    if (!perAuthor) {
+      const breakdownOutput = renderBreakdown(report, format as RenderFormat);
+      if (breakdownOutput !== undefined) {
+        process.stdout.write('\n' + breakdownOutput + '\n');
+      }
+    }
   }
 };
 
 main().catch((err: unknown) => {
-  if (err instanceof CommanderError) {
-    process.exit(err.exitCode);
-  }
   const message = err instanceof Error ? err.message : String(err);
   process.stderr.write(`node-fame: ${message}\n`);
   process.exit(1);

@@ -72,7 +72,6 @@
   "dependencies": {
     "cli-progress": "^3.12.0",
     "cli-table3": "^0.6.5",
-    "commander": "^14.0.3",
     "p-limit": "^7.3.0",
     "picomatch": "^4.0.4"
   }

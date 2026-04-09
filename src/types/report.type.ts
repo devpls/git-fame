@@ -1,4 +1,5 @@
 import type { AuthorStats } from './author-stats.type.js';
+import type { BreakdownEntry } from './breakdown-entry.type.js';
 import type { Warning } from './warning.type.js';
 
 export interface Report {
@@ -26,4 +27,5 @@ export interface Report {
   };
   authors: AuthorStats[];
   warnings: Warning[];
+  breakdown?: BreakdownEntry[];
 }

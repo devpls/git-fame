@@ -38,14 +38,34 @@ describe('parseFlags', () => {
     expect(options.options?.applyMailmap).toBe(false);
   });
 
-  it('passes include-globs as an array', () => {
-    const { options } = parseFlags([...base, '--include-globs', '*.ts', '*.tsx']);
+  it('passes include-globs as an array from comma-separated string', () => {
+    const { options } = parseFlags([...base, '--include-globs', '*.ts,*.tsx']);
     expect(options.includeGlobs).toEqual(['*.ts', '*.tsx']);
   });
 
   it('passes exclude-globs as an array', () => {
     const { options } = parseFlags([...base, '--exclude-globs', 'vendor/**']);
     expect(options.excludeGlobs).toEqual(['vendor/**']);
+  });
+
+  it('sets bytype groupBy', () => {
+    const { options } = parseFlags([...base, '--bytype']);
+    expect(options.groupBy).toEqual({ type: 'extension', depth: 0 });
+  });
+
+  it('sets bydir groupBy with depth', () => {
+    const { options } = parseFlags([...base, '--bydir', '2']);
+    expect(options.groupBy).toEqual({ type: 'directory', depth: 2 });
+  });
+
+  it('sets perAuthor flag', () => {
+    const { perAuthor } = parseFlags([...base, '--bytype', '--per-author']);
+    expect(perAuthor).toBe(true);
+  });
+
+  it('accepts comma-separated include-globs', () => {
+    const { options } = parseFlags([...base, '--include-globs', '*.ts,*.tsx']);
+    expect(options.includeGlobs).toEqual(['*.ts', '*.tsx']);
   });
 
   it('sets minified to false with --exclude-minified', () => {

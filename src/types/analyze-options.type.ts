@@ -36,4 +36,8 @@ export interface AnalyzeOptions {
   cache?: boolean;
   onProgress?: (event: ProgressEvent) => void;
   submodules?: boolean;
+  groupBy?: {
+    type: 'extension' | 'directory';
+    depth: number;
+  };
 }

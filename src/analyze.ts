@@ -148,6 +148,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
       { rev: discovered.headSha, followRenames, ignoreWhitespace },
       options.onProgress,
       options.concurrency,
+      options.groupBy,
     ),
   ]);
 

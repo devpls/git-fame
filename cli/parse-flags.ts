@@ -1,7 +1,8 @@
-import { Command } from 'commander';
+import { parseArgs } from 'node:util';
 import type { AnalyzeOptions } from '../src/types/analyze-options.type.js';
 import type { RenderOptions, SortableColumn } from '../src/render/index.js';
 import { loadConfig } from '../src/internal/config/load-config.js';
+import { HELP_TEXT } from './help.js';
 
 export interface ParsedFlags {
   options: AnalyzeOptions;
@@ -9,147 +10,155 @@ export interface ParsedFlags {
   renderOptions: RenderOptions;
   recursive: boolean;
   splitSubmodules: boolean;
+  perAuthor: boolean;
 }
 
 export const parseFlags = (argv: string[]): ParsedFlags => {
-  const program = new Command()
-    .name('node-fame')
-    .version('0.1.0')
-    .description('Fast, accurate git contribution stats — lines, commits, files per author.')
-    .argument('[path]', 'Repository path', process.cwd())
-    .option('--include-whitespace', 'Count whitespace-only changes as meaningful')
-    .option('--include-binary', 'Include binary files in analysis')
-    .option('--include-generated', 'Include generated/vendored files (lock files, dist/, etc.)')
-    .option('--exclude-minified', 'Exclude minified files (avg line length > 500 chars)')
-    .option('--no-follow-renames', 'Do not follow renames/copies in git blame')
-    .option('--no-mailmap', 'Do not apply .mailmap for identity canonicalisation')
-    .option('--include-globs <patterns...>', 'Only analyze files matching these glob patterns')
-    .option('--exclude-globs <patterns...>', 'Exclude files matching these glob patterns')
-    .option('--format <format>', 'Output format (table)', 'table')
-    .option(
-      '--sort <column>',
-      'Sort by column (linesAlive, linesAdded, linesDeleted, commits, files)',
-      'linesAlive',
-    )
-    .option('--limit <n>', 'Show only top N authors', parseInt)
-    .option('--rev <ref>', 'Analyze at a specific commit, tag, or branch')
-    .option('--from <ref>', 'Start of commit range (used with --to)')
-    .option('--to <ref>', 'End of commit range (used with --from)')
-    .option('--since <date>', 'Only count log entries after this date (ISO 8601)')
-    .option('--until <date>', 'Only count log entries before this date (ISO 8601)')
-    .option('--concurrency <n>', 'Number of parallel blame workers (default: cpus * 1.2)', parseInt)
-    .option('--no-cache', 'Disable result caching')
-    .option('--submodules', 'Walk into submodules')
-    .option('--split-submodules', 'Output separate reports per submodule (implies --submodules)')
-    .option('--recursive', 'Analyze all git repos in subdirectories')
-    .exitOverride()
-    .parse(argv);
+  const { values, positionals } = parseArgs({
+    args: argv.slice(2),
+    options: {
+      help: { type: 'boolean', short: 'h' },
+      version: { type: 'boolean', short: 'V' },
+      format: { type: 'string' },
+      sort: { type: 'string' },
+      limit: { type: 'string' },
+      rev: { type: 'string' },
+      from: { type: 'string' },
+      to: { type: 'string' },
+      since: { type: 'string' },
+      until: { type: 'string' },
+      'include-whitespace': { type: 'boolean' },
+      'include-binary': { type: 'boolean' },
+      'include-generated': { type: 'boolean' },
+      'exclude-minified': { type: 'boolean' },
+      'no-follow-renames': { type: 'boolean' },
+      'no-mailmap': { type: 'boolean' },
+      'include-globs': { type: 'string' },
+      'exclude-globs': { type: 'string' },
+      concurrency: { type: 'string' },
+      'no-cache': { type: 'boolean' },
+      bytype: { type: 'boolean' },
+      bydir: { type: 'string' },
+      'per-author': { type: 'boolean' },
+      submodules: { type: 'boolean' },
+      'split-submodules': { type: 'boolean' },
+      recursive: { type: 'boolean' },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
 
-  const opts = program.opts();
-  const path = program.args[0] ?? process.cwd();
-
-  const config = loadConfig(path);
-
-  const include: AnalyzeOptions['include'] = {
-    whitespace:
-      (opts.includeWhitespace as boolean | undefined) ?? config.includeWhitespace ?? false,
-    binary: (opts.includeBinary as boolean | undefined) ?? config.includeBinary ?? false,
-    generated: (opts.includeGenerated as boolean | undefined) ?? config.includeGenerated ?? false,
-  };
-  if (
-    (opts.excludeMinified as boolean | undefined) === true ||
-    (config.excludeMinified === true && (opts.excludeMinified as boolean | undefined) === undefined)
-  ) {
-    include.minified = false;
+  if (values.help === true) {
+    process.stdout.write(HELP_TEXT);
+    process.exit(0);
   }
 
-  const followRenamesSource = program.getOptionValueSource('followRenames');
-  const mailmapSource = program.getOptionValueSource('mailmap');
+  if (values.version === true) {
+    process.stdout.write('0.1.0\n');
+    process.exit(0);
+  }
+
+  const path = positionals[0] ?? process.cwd();
+  const config = loadConfig(path);
+
+  // Comma-split globs
+  const cliIncludeGlobs =
+    values['include-globs'] !== undefined ? values['include-globs'].split(',') : undefined;
+  const cliExcludeGlobs =
+    values['exclude-globs'] !== undefined ? values['exclude-globs'].split(',') : undefined;
+
+  const include: AnalyzeOptions['include'] = {
+    whitespace: values['include-whitespace'] ?? config.includeWhitespace ?? false,
+    binary: values['include-binary'] ?? config.includeBinary ?? false,
+    generated: values['include-generated'] ?? config.includeGenerated ?? false,
+  };
+  if (values['exclude-minified'] === true || config.excludeMinified === true) {
+    include.minified = false;
+  }
 
   const analyzeOptions: AnalyzeOptions = {
     path,
     include,
     options: {
-      followRenames:
-        followRenamesSource === 'cli'
-          ? (opts.followRenames as boolean)
-          : (config.followRenames ?? true),
-      applyMailmap: mailmapSource === 'cli' ? (opts.mailmap as boolean) : (config.mailmap ?? true),
+      followRenames: values['no-follow-renames'] === true ? false : (config.followRenames ?? true),
+      applyMailmap: values['no-mailmap'] === true ? false : (config.mailmap ?? true),
     },
   };
 
-  const cliGlobs = opts.includeGlobs as string[] | undefined;
-  if (cliGlobs !== undefined) {
-    analyzeOptions.includeGlobs = cliGlobs;
+  if (cliIncludeGlobs !== undefined) {
+    analyzeOptions.includeGlobs = cliIncludeGlobs;
   } else if (config.includeGlobs !== undefined) {
     analyzeOptions.includeGlobs = config.includeGlobs;
   }
 
-  const cliExclude = opts.excludeGlobs as string[] | undefined;
-  if (cliExclude !== undefined) {
-    analyzeOptions.excludeGlobs = cliExclude;
+  if (cliExcludeGlobs !== undefined) {
+    analyzeOptions.excludeGlobs = cliExcludeGlobs;
   } else if (config.excludeGlobs !== undefined) {
     analyzeOptions.excludeGlobs = config.excludeGlobs;
   }
 
-  if ((opts.rev as string | undefined) !== undefined) {
-    analyzeOptions.rev = opts.rev as string;
+  if (values.rev !== undefined) {
+    analyzeOptions.rev = values.rev;
   } else if (config.rev !== undefined) {
     analyzeOptions.rev = config.rev;
   }
 
-  const cliFrom = opts.from as string | undefined;
-  const cliTo = opts.to as string | undefined;
-  if (cliFrom !== undefined && cliTo !== undefined) {
-    analyzeOptions.range = { from: cliFrom, to: cliTo };
+  if (values.from !== undefined && values.to !== undefined) {
+    analyzeOptions.range = { from: values.from, to: values.to };
   } else if (config.from !== undefined && config.to !== undefined) {
     analyzeOptions.range = { from: config.from, to: config.to };
   }
 
-  if ((opts.since as string | undefined) !== undefined) {
-    analyzeOptions.since = new Date(opts.since as string);
+  if (values.since !== undefined) {
+    analyzeOptions.since = new Date(values.since);
   } else if (config.since !== undefined) {
     analyzeOptions.since = new Date(config.since);
   }
 
-  if ((opts.until as string | undefined) !== undefined) {
-    analyzeOptions.until = new Date(opts.until as string);
+  if (values.until !== undefined) {
+    analyzeOptions.until = new Date(values.until);
   } else if (config.until !== undefined) {
     analyzeOptions.until = new Date(config.until);
   }
 
-  const cliConcurrency = opts.concurrency as number | undefined;
+  const cliConcurrency =
+    values.concurrency !== undefined ? parseInt(values.concurrency, 10) : undefined;
   if (cliConcurrency !== undefined && !isNaN(cliConcurrency)) {
     analyzeOptions.concurrency = cliConcurrency;
   } else if (config.concurrency !== undefined) {
     analyzeOptions.concurrency = config.concurrency;
   }
 
-  const cacheSource = program.getOptionValueSource('cache');
-  analyzeOptions.cache = cacheSource === 'cli' ? (opts.cache as boolean) : (config.cache ?? true);
+  analyzeOptions.cache = values['no-cache'] === true ? false : (config.cache ?? true);
 
-  const submodules = (opts.submodules as boolean | undefined) ?? config.submodules ?? false;
-  const splitSubmodules =
-    (opts.splitSubmodules as boolean | undefined) ?? config.splitSubmodules ?? false;
-  const recursive = (opts.recursive as boolean | undefined) ?? config.recursive ?? false;
+  const submodules = values.submodules ?? config.submodules ?? false;
+  const splitSubmodules = values['split-submodules'] ?? config.splitSubmodules ?? false;
+  const recursive = values.recursive ?? config.recursive ?? false;
 
   if (submodules || splitSubmodules) {
     analyzeOptions.submodules = true;
   }
 
-  const formatSource = program.getOptionValueSource('format');
-  const format =
-    formatSource === 'cli' ? (opts.format as string) : (config.format ?? (opts.format as string));
+  // Breakdown: --bytype / --bydir
+  if (values.bytype === true && values.bydir !== undefined) {
+    process.stderr.write('node-fame: --bytype and --bydir are mutually exclusive\n');
+    process.exit(1);
+  }
+  if (values.bytype === true) {
+    analyzeOptions.groupBy = { type: 'extension', depth: 0 };
+  } else if (values.bydir !== undefined) {
+    const depth = parseInt(values.bydir, 10);
+    if (isNaN(depth) || depth < 1) {
+      process.stderr.write('node-fame: --bydir requires a positive integer depth\n');
+      process.exit(1);
+    }
+    analyzeOptions.groupBy = { type: 'directory', depth };
+  }
 
-  const sortSource = program.getOptionValueSource('sort');
-  const sort =
-    sortSource === 'cli' ? (opts.sort as string) : (config.sort ?? (opts.sort as string));
-
-  const limitSource = program.getOptionValueSource('limit');
-  const limit =
-    limitSource === 'cli'
-      ? (opts.limit as number | undefined)
-      : (config.limit ?? (opts.limit as number | undefined));
+  const format = values.format ?? config.format ?? 'table';
+  const sort = values.sort ?? config.sort ?? 'linesAlive';
+  const cliLimit = values.limit !== undefined ? parseInt(values.limit, 10) : undefined;
+  const limit = cliLimit ?? config.limit;
 
   return {
     options: analyzeOptions,
@@ -160,5 +169,6 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
     },
     recursive,
     splitSubmodules,
+    perAuthor: values['per-author'] ?? false,
   };
 };

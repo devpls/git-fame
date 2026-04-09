@@ -5,7 +5,11 @@ const HEADER_REGEX = /^([0-9a-f]{40}) \d+ \d+(?: \d+)?$/;
 const stripAngleBrackets = (s: string): string =>
   s.startsWith('<') && s.endsWith('>') ? s.slice(1, -1) : s;
 
-export const countBlameLines = (output: string, aggregator: Aggregator): void => {
+export const countBlameLines = (
+  output: string,
+  aggregator: Aggregator,
+  groupKey?: string,
+): void => {
   if (output.length === 0) {
     return;
   }
@@ -25,6 +29,9 @@ export const countBlameLines = (output: string, aggregator: Aggregator): void =>
 
     if (line.startsWith('\t')) {
       aggregator.recordBlameAuthor(currentName, currentMail);
+      if (groupKey !== undefined) {
+        aggregator.recordBlameGroup(currentName, currentMail, groupKey);
+      }
       if (!hasCached && currentSha !== '') {
         cache.set(currentSha, { name: currentName, mail: currentMail });
       }
