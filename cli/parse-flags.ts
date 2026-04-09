@@ -21,6 +21,11 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
     .option('--include-globs <patterns...>', 'Only analyze files matching these glob patterns')
     .option('--exclude-globs <patterns...>', 'Exclude files matching these glob patterns')
     .option('--format <format>', 'Output format (table)', 'table')
+    .option('--rev <ref>', 'Analyze at a specific commit, tag, or branch')
+    .option('--from <ref>', 'Start of commit range (used with --to)')
+    .option('--to <ref>', 'End of commit range (used with --from)')
+    .option('--since <date>', 'Only count log entries after this date (ISO 8601)')
+    .option('--until <date>', 'Only count log entries before this date (ISO 8601)')
     .exitOverride()
     .parse(argv);
 
@@ -49,6 +54,21 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   }
   if ((opts.excludeGlobs as string[] | undefined) !== undefined) {
     analyzeOptions.excludeGlobs = opts.excludeGlobs as string[];
+  }
+  if ((opts.rev as string | undefined) !== undefined) {
+    analyzeOptions.rev = opts.rev as string;
+  }
+  if (
+    (opts.from as string | undefined) !== undefined &&
+    (opts.to as string | undefined) !== undefined
+  ) {
+    analyzeOptions.range = { from: opts.from as string, to: opts.to as string };
+  }
+  if ((opts.since as string | undefined) !== undefined) {
+    analyzeOptions.since = new Date(opts.since as string);
+  }
+  if ((opts.until as string | undefined) !== undefined) {
+    analyzeOptions.until = new Date(opts.until as string);
   }
 
   return {

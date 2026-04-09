@@ -53,4 +53,29 @@ describe('parseFlags', () => {
     const { format } = parseFlags([...base]);
     expect(format).toBe('table');
   });
+
+  it('passes --rev as options.rev', () => {
+    const { options } = parseFlags([...base, '--rev', 'v1.0', '/path']);
+    expect(options.rev).toBe('v1.0');
+  });
+
+  it('builds range from --from and --to', () => {
+    const { options } = parseFlags([...base, '--from', 'v1', '--to', 'v2', '/path']);
+    expect(options.range).toEqual({ from: 'v1', to: 'v2' });
+  });
+
+  it('parses --since as a Date', () => {
+    const { options } = parseFlags([...base, '--since', '2024-01-01']);
+    expect(options.since).toBeInstanceOf(Date);
+  });
+
+  it('parses --until as a Date', () => {
+    const { options } = parseFlags([...base, '--until', '2024-12-31']);
+    expect(options.until).toBeInstanceOf(Date);
+  });
+
+  it('leaves range undefined when only --from is provided', () => {
+    const { options } = parseFlags([...base, '--from', 'v1']);
+    expect(options.range).toBeUndefined();
+  });
 });
