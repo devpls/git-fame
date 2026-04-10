@@ -113,7 +113,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     }
   }
 
-  options.onProgress?.({ type: 'phase', phase: 'discover' });
+  options.onProgress?.({ type: 'phase', phase: 'discover', path: options.path });
   const discovered = await discover(options.path, {
     includeGenerated,
     includeMinified,
@@ -129,7 +129,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     aggregator.recordWarning(warning);
   }
 
-  options.onProgress?.({ type: 'phase', phase: 'log' });
+  options.onProgress?.({ type: 'phase', phase: 'log', path: options.path });
   const logOptions: LogPhaseOptions = {
     ...(discovered.range !== undefined && {
       range: { fromSha: discovered.range.fromSha, toSha: discovered.range.toSha },
@@ -138,7 +138,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     ...(options.until !== undefined && { until: options.until }),
   };
 
-  options.onProgress?.({ type: 'phase', phase: 'blame' });
+  options.onProgress?.({ type: 'phase', phase: 'blame', path: options.path });
   await Promise.all([
     runLogPhase(options.path, aggregator, logOptions),
     runBlamePhase(
@@ -177,7 +177,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     }
   }
 
-  options.onProgress?.({ type: 'phase', phase: 'aggregate' });
+  options.onProgress?.({ type: 'phase', phase: 'aggregate', path: options.path });
   const durationMs = Date.now() - startMs;
 
   const report = assembleReport(aggregator, {

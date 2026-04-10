@@ -8,31 +8,46 @@ import type { AnalyzeManyOptions } from '../src/types/analyze-many-options.type.
 import type { ProgressEvent } from '../src/types/progress-event.type.js';
 import { parseFlags } from './parse-flags.js';
 
+const wireProgress = (
+  options: { onProgress?: (event: ProgressEvent) => void },
+  isTTY: boolean | undefined,
+): void => {
+  if (!isTTY) {
+    return;
+  }
+
+  let bar: cliProgress.SingleBar | undefined;
+
+  let repoName = '';
+
+  options.onProgress = (event: ProgressEvent): void => {
+    if (event.type === 'phase' && event.phase === 'discover') {
+      repoName = event.path.split('/').pop() ?? event.path;
+    }
+    if (event.type === 'blame' && bar === undefined) {
+      bar = new cliProgress.SingleBar(
+        { format: `${repoName} [{bar}] {value}/{total} files` },
+        cliProgress.Presets.shades_classic,
+      );
+      bar.start(event.total, 0);
+    }
+    if (event.type === 'blame' && bar !== undefined) {
+      bar.update(event.done);
+    }
+    if (event.type === 'phase' && event.phase === 'aggregate' && bar !== undefined) {
+      bar.stop();
+      bar = undefined;
+    }
+  };
+};
+
 const main = async (): Promise<void> => {
   const { options, format, renderOptions, recursive, splitSubmodules, perAuthor } = parseFlags(
     process.argv,
   );
   const needsMany = recursive || splitSubmodules;
 
-  // Wire progress bar only on TTY
-  let bar: cliProgress.SingleBar | undefined;
-  if (process.stdout.isTTY) {
-    options.onProgress = (event: ProgressEvent): void => {
-      if (event.type === 'blame' && bar === undefined) {
-        bar = new cliProgress.SingleBar(
-          { format: 'Analyzing [{bar}] {value}/{total} files' },
-          cliProgress.Presets.shades_classic,
-        );
-        bar.start(event.total, 0);
-      }
-      if (event.type === 'blame' && bar !== undefined) {
-        bar.update(event.done);
-      }
-      if (event.type === 'phase' && event.phase === 'aggregate' && bar !== undefined) {
-        bar.stop();
-      }
-    };
-  }
+  wireProgress(options, process.stdout.isTTY);
 
   if (needsMany) {
     const manyOptions: AnalyzeManyOptions = { ...options, recursive, splitSubmodules };
@@ -40,10 +55,16 @@ const main = async (): Promise<void> => {
     for (const report of reports) {
       process.stdout.write(`\n=== ${report.repo.path} ===\n`);
       process.stdout.write(render(report, format as RenderFormat, renderOptions) + '\n');
+
+      if (!perAuthor) {
+        const breakdownOutput = renderBreakdown(report, format as RenderFormat);
+        if (breakdownOutput !== undefined) {
+          process.stdout.write('\n' + breakdownOutput + '\n');
+        }
+      }
     }
   } else {
     const report = await analyze(options);
-    // progress bar already wired via onProgress
     const output = render(report, format as RenderFormat, renderOptions);
     process.stdout.write(output + '\n');
 
