@@ -1,59 +1,177 @@
-# node-fame
+# git-fame
 
 Fast, accurate git contribution stats — lines, commits, files per author.
 
-Inspired by git-fame (Python), rewritten in TypeScript for correctness and speed.
-
-## Features
-
-- Two metrics: lines alive in HEAD (blame) + lines added/deleted (log)
-- Smart defaults: excludes generated files, ignores whitespace changes, follows renames
-- Fast: parallel blame, 7-10x faster than git-fame
-- Flexible output: table, JSON, CSV, Markdown
-- Multi-repo: submodules, recursive workspace analysis
-- Library + CLI
+Inspired by [git-fame](https://github.com/casperdcl/git-fame) (Python), rewritten in TypeScript. **47x faster** on real-world repos.
 
 ## Quick start
 
-```
-npx node-fame .
-npx node-fame /path/to/repo
-npx node-fame --format json .
-npx node-fame --include-globs '*.ts' '*.tsx' .
+```bash
+npx git-fame .
+npx git-fame /path/to/repo
+npx git-fame --format json .
+npx git-fame --bytype .
 ```
 
 ## Installation
 
-```
-npm install -g node-fame
-npm install node-fame
+```bash
+npm install -g git-fame    # global CLI
+npm install git-fame       # library dependency
 ```
 
-## CLI Usage
+## Features
 
-(Full flag list from --help, formatted as a table or code block)
+- **Two metrics**: lines alive in HEAD (blame) + lines added/deleted (log)
+- **Smart defaults**: excludes generated files, ignores whitespace, follows renames
+- **Fast**: parallel blame workers, ~11s on 2800-file repo (Python git-fame: ~530s)
+- **Breakdown**: `--bytype` groups by file extension, `--bydir 1` by directory
+- **Caching**: results cached by commit SHA, instant on repeat runs
+- **Config file**: `.gitfamerc` pins flags per repo
+- **Multi-repo**: `--recursive` scans all repos in a directory
+- **Output formats**: table, JSON, CSV, Markdown
+- **Library + CLI**: use as `npx git-fame` or `import { analyze } from 'git-fame'`
+
+## CLI
+
+```
+Usage: git-fame [options] [path]
+
+Options:
+  -V, --version                  Output the version number
+  --format <format>              Output format: table, json, csv, markdown (default: table)
+  --sort <column>                Sort by: linesAlive, linesAdded, linesDeleted, commits, files
+  --limit <n>                    Show only top N authors
+  --rev <ref>                    Analyze at a specific commit, tag, or branch
+  --from <ref>                   Start of commit range (used with --to)
+  --to <ref>                     End of commit range (used with --from)
+  --since <date>                 Only count log entries after this date
+  --until <date>                 Only count log entries before this date
+  --include-whitespace           Count whitespace-only changes
+  --include-binary               Include binary files
+  --include-generated            Include generated/vendored files
+  --exclude-minified             Exclude minified files
+  --no-follow-renames            Do not follow renames in blame
+  --no-mailmap                   Do not apply .mailmap
+  --include-globs <a,b,c>        Only analyze matching files (comma-separated)
+  --exclude-globs <a,b,c>        Exclude matching files (comma-separated)
+  --concurrency <n>              Parallel blame workers (default: auto)
+  --no-cache                     Disable result caching
+  --bytype                       Group results by file extension
+  --bydir <depth>                Group results by directory at given depth
+  --per-author                   Show breakdown per author (with --bytype or --bydir)
+  --submodules                   Walk into submodules
+  --split-submodules             Separate reports per submodule
+  --recursive                    Analyze all repos in subdirectories
+  -h, --help                     Display help
+```
+
+## Examples
+
+**Default output:**
+
+```bash
+$ git-fame .
+┌───────┬────────────┬────────────┬──────────────┬─────────┬───────┐
+│ author│ linesAlive │ linesAdded │ linesDeleted │ commits │ files │
+├───────┼────────────┼────────────┼──────────────┼─────────┼───────┤
+│ Alice │ 5200       │ 12000      │ 3000         │ 120     │ 85    │
+│ Bob   │ 300        │ 800        │ 200          │ 45      │ 30    │
+└───────┴────────────┴────────────┴──────────────┴─────────┴───────┘
+```
+
+**Breakdown by file type:**
+
+```bash
+$ git-fame --bytype .
+┌───────┬────────────┬───────┐
+│ group │ linesAlive │ files │
+├───────┼────────────┼───────┤
+│ .ts   │ 113918     │ 2562  │
+│ .tsx  │ 22490      │ 235   │
+│ .css  │ 348        │ 18    │
+└───────┴────────────┴───────┘
+```
+
+**Filter by file type:**
+
+```bash
+$ git-fame --include-globs '*.ts,*.tsx' .
+```
+
+**Recursive (multiple repos):**
+
+```bash
+$ git-fame --recursive ~/work --limit 10
+```
+
+## Config file
+
+Create `.gitfamerc` in your repo root to pin default flags:
+
+```json
+{
+  "format": "table",
+  "includeGlobs": ["*.ts", "*.tsx"],
+  "excludeGlobs": ["*.test.ts"],
+  "limit": 20,
+  "sort": "linesAlive"
+}
+```
+
+CLI flags override config values.
 
 ## Library API
 
 ```ts
-import { analyze, render } from 'node-fame';
-const report = await analyze({ path: '.' });
+import { analyze, render } from 'git-fame';
+
+const report = await analyze({ path: '/path/to/repo' });
 console.log(render(report, 'table'));
 ```
 
-## Multi-repo
+```ts
+import { analyze } from 'git-fame';
+
+const report = await analyze({
+  path: '.',
+  include: { generated: false },
+  includeGlobs: ['*.ts', '*.tsx'],
+  groupBy: { type: 'extension', depth: 0 },
+});
+
+console.log(JSON.stringify(report, null, 2));
+```
+
+**Multi-repo:**
 
 ```ts
-import { analyzeMany } from 'node-fame';
+import { analyzeMany } from 'git-fame';
+
 const reports = await analyzeMany({ path: '/workspace', recursive: true });
 ```
 
+## Performance
+
+Benchmarked on a 2800-file TypeScript repo (Apple Silicon):
+
+| Tool              | Time    | vs Python      |
+| ----------------- | ------- | -------------- |
+| Python git-fame   | 530s    | baseline       |
+| **git-fame**      | **11s** | **47x faster** |
+| git-fame (cached) | <0.5s   | instant        |
+
 ## How it works
 
-1. Discover — list files, filter binary/generated
-2. Log — git log --numstat
-3. Blame — parallel git blame --line-porcelain -w -M -C
-4. Assemble — merge into Report
+1. **Discover** — `git ls-files`, filter binary/generated/minified
+2. **Log** — `git log --numstat` for additions/deletions per author
+3. **Blame** — parallel `git blame --porcelain -w -M -C` via persistent shell workers
+4. **Assemble** — merge into a typed `Report`
+
+## Requirements
+
+- Node.js >= 20
+- git installed
 
 ## License
 

@@ -349,6 +349,46 @@ describe('analyze', () => {
     expect(libAuthor).toBeUndefined();
   });
 
+  it('returns cached result on second call with same options', async () => {
+    const dir = buildRepo([
+      { author: 'Alice <a@x>', date: '2024-01-01T00:00:00Z', files: { 'a.txt': 'hello\n' } },
+    ]);
+    createdRepos.push(dir);
+
+    const first = await analyze({ path: dir });
+    expect(first.meta.cached).toBe(false);
+
+    const second = await analyze({ path: dir });
+    expect(second.meta.cached).toBe(true);
+    expect(second.authors).toEqual(first.authors);
+    expect(second.repo.headSha).toBe(first.repo.headSha);
+  });
+
+  it('skips cache when cache: false', async () => {
+    const dir = buildRepo([
+      { author: 'Alice <a@x>', date: '2024-01-01T00:00:00Z', files: { 'a.txt': 'hello\n' } },
+    ]);
+    createdRepos.push(dir);
+
+    await analyze({ path: dir });
+    const second = await analyze({ path: dir, cache: false });
+    expect(second.meta.cached).toBe(false);
+  });
+
+  it('skips cache on dirty worktree', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const dir = buildRepo([
+      { author: 'Alice <a@x>', date: '2024-01-01T00:00:00Z', files: { 'a.txt': 'hello\n' } },
+    ]);
+    createdRepos.push(dir);
+
+    await analyze({ path: dir });
+    writeFileSync(join(dir, 'a.txt'), 'modified\n', 'utf8');
+    const second = await analyze({ path: dir });
+    expect(second.meta.cached).toBe(false);
+  });
+
   it('works in detached HEAD state', async () => {
     const dir = buildRepo([
       {
@@ -391,5 +431,45 @@ describe('analyze', () => {
 
     const totalLinesAlive = report.authors.reduce((sum, a) => sum + a.linesAlive, 0);
     expect(totalLinesAlive).toBe(0);
+  });
+
+  it('populates breakdown when groupBy extension is set', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'a.ts': 'line\n', 'b.css': 'style\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, groupBy: { type: 'extension', depth: 0 } });
+    expect(report.breakdown).toBeDefined();
+    expect(report.breakdown!.length).toBeGreaterThanOrEqual(2);
+
+    const tsEntry = report.breakdown!.find((e) => e.group === '.ts');
+    expect(tsEntry?.linesAlive).toBe(1);
+    expect(tsEntry?.files).toBe(1);
+  });
+
+  it('populates breakdown when groupBy directory depth 1 is set', async () => {
+    const dir = buildRepo([
+      {
+        author: 'Alice <a@x>',
+        date: '2024-01-01T00:00:00Z',
+        files: { 'src/a.ts': 'line\n', 'cli/b.ts': 'line\n', 'root.txt': 'line\n' },
+      },
+    ]);
+    createdRepos.push(dir);
+
+    const report = await analyze({ path: dir, groupBy: { type: 'directory', depth: 1 } });
+    expect(report.breakdown).toBeDefined();
+
+    const srcEntry = report.breakdown!.find((e) => e.group === 'src');
+    const cliEntry = report.breakdown!.find((e) => e.group === 'cli');
+    const rootEntry = report.breakdown!.find((e) => e.group === '(root)');
+    expect(srcEntry?.linesAlive).toBe(1);
+    expect(cliEntry?.linesAlive).toBe(1);
+    expect(rootEntry?.linesAlive).toBe(1);
   });
 });

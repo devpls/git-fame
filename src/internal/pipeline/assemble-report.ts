@@ -23,6 +23,7 @@ export const assembleReport = (aggregator: Aggregator, ctx: AssembleContext): Re
       version: NODE_FAME_VERSION,
       generatedAt: ctx.startedAt,
       durationMs: ctx.durationMs,
+      cached: false,
     },
     {
       path: ctx.path,

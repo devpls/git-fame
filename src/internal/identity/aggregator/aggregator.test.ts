@@ -185,6 +185,7 @@ describe('Aggregator.build', () => {
         version: '0.1.0',
         generatedAt: new Date('2024-02-01T00:00:00Z'),
         durationMs: 42,
+        cached: false,
       },
       {
         path: '/tmp/repo',
@@ -215,7 +216,7 @@ describe('Aggregator.build', () => {
     const agg = new Aggregator();
     agg.recordWarning({ code: 'FILE_SKIPPED_BINARY', file: 'x.png', message: 'skipped' });
     const report = agg.build(
-      { version: '0.1.0', generatedAt: new Date(0), durationMs: 0 },
+      { version: '0.1.0', generatedAt: new Date(0), durationMs: 0, cached: false },
       {
         path: '/tmp/repo',
         headSha: 'x'.repeat(40),
@@ -231,7 +232,7 @@ describe('Aggregator.build', () => {
     const agg = new Aggregator();
     agg.recordBlameLine(makeBlameLine({ authorMail: 'a@x', authorTime: 1700000000 }));
     const report = agg.build(
-      { version: '0.1.0', generatedAt: new Date(0), durationMs: 0 },
+      { version: '0.1.0', generatedAt: new Date(0), durationMs: 0, cached: false },
       {
         path: '/tmp/repo',
         headSha: 'x'.repeat(40),

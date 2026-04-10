@@ -4,6 +4,12 @@ import { renderTable } from './table/index.js';
 import { renderJson } from './json/index.js';
 import { renderCsv } from './csv/index.js';
 import { renderMarkdown } from './markdown/index.js';
+import {
+  renderBreakdownTable,
+  renderBreakdownJson,
+  renderBreakdownCsv,
+  renderBreakdownMarkdown,
+} from './breakdown/index.js';
 
 export type RenderFormat = 'table' | 'json' | 'csv' | 'markdown';
 
@@ -15,4 +21,16 @@ export const render = (report: Report, format: RenderFormat, options?: RenderOpt
   if (f === 'csv') return renderCsv(report, options);
   if (f === 'markdown') return renderMarkdown(report, options);
   throw new Error(`render: unsupported format '${f}'`);
+};
+
+export const renderBreakdown = (report: Report, format: RenderFormat): string | undefined => {
+  if (report.breakdown === undefined || report.breakdown.length === 0) {
+    return undefined;
+  }
+  const f: string = format;
+  if (f === 'table') return renderBreakdownTable(report.breakdown);
+  if (f === 'json') return renderBreakdownJson(report.breakdown);
+  if (f === 'csv') return renderBreakdownCsv(report.breakdown);
+  if (f === 'markdown') return renderBreakdownMarkdown(report.breakdown);
+  return undefined;
 };

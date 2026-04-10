@@ -32,6 +32,12 @@ export interface AnalyzeOptions {
 
   includeGlobs?: string[];
   excludeGlobs?: string[];
+  concurrency?: number;
+  cache?: boolean;
   onProgress?: (event: ProgressEvent) => void;
   submodules?: boolean;
+  groupBy?: {
+    type: 'extension' | 'directory';
+    depth: number;
+  };
 }

@@ -1,5 +1,13 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { ConflictingOptionsError } from './errors/conflicting-options.error.js';
+import {
+  computeFingerprint,
+  isWorktreeClean,
+  readCache,
+  writeCache,
+} from './internal/cache/index.js';
 import { Aggregator } from './internal/identity/aggregator/index.js';
 import { discoverSubmodules } from './internal/git/discover-submodules.js';
 import { loadMailmap } from './internal/identity/mailmap/index.js';
@@ -51,7 +59,61 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     excludeGlobs,
   } = resolveDefaults(options);
 
-  options.onProgress?.({ type: 'phase', phase: 'discover' });
+  const useCache = options.cache !== false;
+  let cacheFilePath: string | undefined;
+
+  if (useCache) {
+    const gitDirResult = spawnSync('git', ['rev-parse', '--git-dir'], {
+      cwd: options.path,
+      encoding: 'utf8',
+      env: { ...process.env, LC_ALL: 'C', GIT_OPTIONAL_LOCKS: '0' },
+    });
+
+    if (gitDirResult.status === 0 && isWorktreeClean(options.path)) {
+      const gitDir = join(options.path, gitDirResult.stdout.trim());
+      const cacheDir = join(gitDir, 'git-fame-cache');
+
+      const mailmapPath = join(options.path, '.mailmap');
+      const gitattrsPath = join(options.path, '.gitattributes');
+      const mailmapContent = existsSync(mailmapPath) ? readFileSync(mailmapPath, 'utf8') : '';
+      const gitattrsContent = existsSync(gitattrsPath) ? readFileSync(gitattrsPath, 'utf8') : '';
+
+      let commitRef = 'HEAD';
+      if (options.rev !== undefined) {
+        commitRef = options.rev;
+      } else if (options.range !== undefined) {
+        commitRef = `${options.range.from}..${options.range.to}`;
+      }
+
+      const fingerprint = computeFingerprint({
+        commitRef,
+        since: options.since !== undefined ? options.since.toISOString() : '',
+        until: options.until !== undefined ? options.until.toISOString() : '',
+        followRenames,
+        ignoreWhitespace,
+        applyMailmap,
+        includeGenerated,
+        includeBinary: options.include?.binary ?? false,
+        includeMinified,
+        includeGlobs,
+        excludeGlobs,
+        mailmapContent,
+        gitattributesContent: gitattrsContent,
+      });
+
+      cacheFilePath = join(cacheDir, `${fingerprint}.json`);
+
+      const cached = readCache(cacheFilePath);
+      if (cached !== undefined) {
+        const cacheDurationMs = Date.now() - startMs;
+        cached.meta.durationMs = cacheDurationMs;
+        cached.meta.cached = true;
+        return cached;
+      }
+    }
+  }
+
+  options.onProgress?.({ type: 'phase', phase: 'discover', path: options.path });
   const discovered = await discover(options.path, {
     includeGenerated,
     includeMinified,
@@ -67,7 +129,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     aggregator.recordWarning(warning);
   }
 
-  options.onProgress?.({ type: 'phase', phase: 'log' });
+  options.onProgress?.({ type: 'phase', phase: 'log', path: options.path });
   const logOptions: LogPhaseOptions = {
     ...(discovered.range !== undefined && {
       range: { fromSha: discovered.range.fromSha, toSha: discovered.range.toSha },
@@ -76,7 +138,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     ...(options.until !== undefined && { until: options.until }),
   };
 
-  options.onProgress?.({ type: 'phase', phase: 'blame' });
+  options.onProgress?.({ type: 'phase', phase: 'blame', path: options.path });
   await Promise.all([
     runLogPhase(options.path, aggregator, logOptions),
     runBlamePhase(
@@ -85,6 +147,8 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
       aggregator,
       { rev: discovered.headSha, followRenames, ignoreWhitespace },
       options.onProgress,
+      options.concurrency,
+      options.groupBy,
     ),
   ]);
 
@@ -113,10 +177,10 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     }
   }
 
-  options.onProgress?.({ type: 'phase', phase: 'aggregate' });
+  options.onProgress?.({ type: 'phase', phase: 'aggregate', path: options.path });
   const durationMs = Date.now() - startMs;
 
-  return assembleReport(aggregator, {
+  const report = assembleReport(aggregator, {
     path: options.path,
     headSha: discovered.headSha,
     headRef: discovered.headRef,
@@ -124,4 +188,14 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
     durationMs,
     ...(discovered.range !== undefined && { range: discovered.range }),
   });
+
+  if (cacheFilePath !== undefined) {
+    try {
+      writeCache(cacheFilePath, report);
+    } catch {
+      // Cache write failure is non-fatal
+    }
+  }
+
+  return report;
 };

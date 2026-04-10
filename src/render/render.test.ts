@@ -7,6 +7,7 @@ const emptyReport = (): Report => ({
     version: '0.1.0',
     generatedAt: new Date(0),
     durationMs: 0,
+    cached: false,
   },
   repo: {
     path: '/tmp/repo',

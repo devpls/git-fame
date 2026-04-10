@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
+import { afterEach, describe, expect, it } from 'vitest';
 import { parseFlags } from './parse-flags.js';
 
 const base = ['node', 'node-fame'];
@@ -34,14 +38,34 @@ describe('parseFlags', () => {
     expect(options.options?.applyMailmap).toBe(false);
   });
 
-  it('passes include-globs as an array', () => {
-    const { options } = parseFlags([...base, '--include-globs', '*.ts', '*.tsx']);
+  it('passes include-globs as an array from comma-separated string', () => {
+    const { options } = parseFlags([...base, '--include-globs', '*.ts,*.tsx']);
     expect(options.includeGlobs).toEqual(['*.ts', '*.tsx']);
   });
 
   it('passes exclude-globs as an array', () => {
     const { options } = parseFlags([...base, '--exclude-globs', 'vendor/**']);
     expect(options.excludeGlobs).toEqual(['vendor/**']);
+  });
+
+  it('sets bytype groupBy', () => {
+    const { options } = parseFlags([...base, '--bytype']);
+    expect(options.groupBy).toEqual({ type: 'extension', depth: 0 });
+  });
+
+  it('sets bydir groupBy with depth', () => {
+    const { options } = parseFlags([...base, '--bydir', '2']);
+    expect(options.groupBy).toEqual({ type: 'directory', depth: 2 });
+  });
+
+  it('sets perAuthor flag', () => {
+    const { perAuthor } = parseFlags([...base, '--bytype', '--per-author']);
+    expect(perAuthor).toBe(true);
+  });
+
+  it('accepts comma-separated include-globs', () => {
+    const { options } = parseFlags([...base, '--include-globs', '*.ts,*.tsx']);
+    expect(options.includeGlobs).toEqual(['*.ts', '*.tsx']);
   });
 
   it('sets minified to false with --exclude-minified', () => {
@@ -103,5 +127,48 @@ describe('parseFlags', () => {
     const result = parseFlags([...base, '--split-submodules']);
     expect(result.splitSubmodules).toBe(true);
     expect(result.options.submodules).toBe(true);
+  });
+
+  describe('config file integration', () => {
+    const created: string[] = [];
+
+    afterEach(() => {
+      for (const dir of created.splice(0)) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+        } catch {
+          // best-effort cleanup
+        }
+      }
+    });
+
+    it('loads .gitfamerc config values', () => {
+      const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
+      created.push(dir);
+      writeFileSync(
+        join(dir, '.gitfamerc'),
+        JSON.stringify({ format: 'json', includeGlobs: ['**/*.ts'], concurrency: 4 }),
+        'utf8',
+      );
+
+      const result = parseFlags(['node', 'cli', dir]);
+      expect(result.format).toBe('json');
+      expect(result.options.includeGlobs).toEqual(['**/*.ts']);
+      expect(result.options.concurrency).toBe(4);
+    });
+
+    it('CLI flags override .gitfamerc', () => {
+      const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
+      created.push(dir);
+      writeFileSync(
+        join(dir, '.gitfamerc'),
+        JSON.stringify({ format: 'json', concurrency: 4 }),
+        'utf8',
+      );
+
+      const result = parseFlags(['node', 'cli', '--format', 'csv', '--concurrency', '8', dir]);
+      expect(result.format).toBe('csv');
+      expect(result.options.concurrency).toBe(8);
+    });
   });
 });

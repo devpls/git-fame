@@ -8,4 +8,5 @@ export interface AuthorStats {
   files: number;
   firstCommit: Date;
   lastCommit: Date;
+  breakdown?: Record<string, number>;
 }

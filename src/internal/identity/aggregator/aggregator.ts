@@ -44,6 +44,8 @@ export class Aggregator {
   private readonly authors = new Map<string, MutableAuthorStats>();
   private readonly warnings: Warning[] = [];
   private readonly mailmap: Mailmap;
+  private readonly authorBreakdown = new Map<string, Map<string, number>>();
+  private readonly groupTotals = new Map<string, { linesAlive: number; files: Set<string> }>();
 
   constructor(mailmap?: Mailmap) {
     this.mailmap = mailmap ?? identityMailmap;
@@ -84,6 +86,34 @@ export class Aggregator {
     stats.linesAlive += 1;
   }
 
+  recordBlameAuthor(name: string, mail: string): void {
+    const stats = this.getOrCreate(name, mail);
+    stats.linesAlive += 1;
+  }
+
+  recordBlameGroup(name: string, mail: string, groupKey: string): void {
+    const canonical = this.mailmap.canonicalize(name, mail);
+    const authorMap = this.authorBreakdown.get(canonical.email) ?? new Map<string, number>();
+    authorMap.set(groupKey, (authorMap.get(groupKey) ?? 0) + 1);
+    this.authorBreakdown.set(canonical.email, authorMap);
+
+    const totals = this.groupTotals.get(groupKey);
+    if (totals !== undefined) {
+      totals.linesAlive += 1;
+    } else {
+      this.groupTotals.set(groupKey, { linesAlive: 1, files: new Set<string>() });
+    }
+  }
+
+  recordFileGroup(groupKey: string, filePath: string): void {
+    const existing = this.groupTotals.get(groupKey);
+    if (existing !== undefined) {
+      existing.files.add(filePath);
+    } else {
+      this.groupTotals.set(groupKey, { linesAlive: 0, files: new Set([filePath]) });
+    }
+  }
+
   recordWarning(warning: Warning): void {
     this.warnings.push(warning);
   }
@@ -109,7 +139,14 @@ export class Aggregator {
   }
 
   build(meta: Report['meta'], repoBase: Report['repo']): Report {
-    const authors = Array.from(this.authors.values()).map(finaliseAuthor);
+    const authors = Array.from(this.authors.values()).map((stats) => {
+      const author = finaliseAuthor(stats);
+      const bd = this.authorBreakdown.get(stats.email);
+      if (bd !== undefined && bd.size > 0) {
+        author.breakdown = Object.fromEntries(bd);
+      }
+      return author;
+    });
 
     const totals = authors.reduce(
       (acc, author) => ({
@@ -120,6 +157,17 @@ export class Aggregator {
       { lines: 0, commits: 0, files: 0 },
     );
 
+    const breakdownEntries =
+      this.groupTotals.size > 0
+        ? Array.from(this.groupTotals.entries())
+            .map(([group, data]) => ({
+              group,
+              linesAlive: data.linesAlive,
+              files: data.files.size,
+            }))
+            .sort((a, b) => b.linesAlive - a.linesAlive)
+        : undefined;
+
     return {
       meta,
       repo: {
@@ -128,6 +176,7 @@ export class Aggregator {
       },
       authors,
       warnings: this.warnings.slice(),
+      ...(breakdownEntries !== undefined && { breakdown: breakdownEntries }),
     };
   }
 
@@ -143,5 +192,19 @@ export class Aggregator {
    */
   getWarningsForTesting(): readonly Warning[] {
     return this.warnings;
+  }
+
+  /**
+   * Test-only accessor. Do not call from production code.
+   */
+  getAuthorBreakdownForTesting(): ReadonlyMap<string, Map<string, number>> {
+    return this.authorBreakdown;
+  }
+
+  /**
+   * Test-only accessor. Do not call from production code.
+   */
+  getGroupTotalsForTesting(): ReadonlyMap<string, { linesAlive: number; files: Set<string> }> {
+    return this.groupTotals;
   }
 }

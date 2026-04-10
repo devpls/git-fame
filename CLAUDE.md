@@ -68,18 +68,35 @@ Use `npx vitest run` (not `npx vitest`) unless you want watch mode.
 
 ## Commit style (STRICT)
 
+- **Conventional Commits.** Every commit message must have a type prefix.
 - **Single-line messages.** No body, no blank line, no trailing description.
 - **Plain English.** Describe what changed in ≤ 72 characters where possible.
-- **NO semantic prefixes.** Not `feat:`, `fix:`, `docs:`, `chore:`, etc.
 - **NO `Co-Authored-By` trailers.** Not for Claude, not for anyone.
 - Pass messages with `git commit -m "..."`, not a HEREDOC.
+- Semantic-release reads these prefixes to determine version bumps on
+  merge to main: `feat:` → minor, `fix:` → patch, `feat!:` → major.
+
+Allowed prefixes:
+
+- `feat:` — new feature (minor bump)
+- `feat!:` — breaking change (major bump)
+- `fix:` — bug fix (patch bump)
+- `perf:` — performance improvement (patch bump)
+- `refactor:` — code change that neither fixes nor adds (no bump)
+- `test:` — adding or updating tests (no bump)
+- `docs:` — documentation only (no bump)
+- `ci:` — CI/CD changes (no bump)
+- `chore:` — tooling, deps, maintenance (no bump)
 
 Examples:
 
 ```
-Add typed error classes for git and analysis failures
-Wrap spawnGit non-zero exits in GitCommandError
-Replace tsup with zshy and go ESM-only for TS 6 compatibility
+feat: add result caching by commit SHA with --no-cache flag
+fix: reset progress bar between repos and show repo name
+perf: optimize blame with counting parser and dynamic queue
+feat!: replace Commander with node:util.parseArgs
+docs: update README with benchmarks
+ci: configure semantic-release
 ```
 
 ## Code style
