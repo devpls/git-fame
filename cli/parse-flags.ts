@@ -33,8 +33,8 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
       'exclude-minified': { type: 'boolean' },
       'no-follow-renames': { type: 'boolean' },
       'no-mailmap': { type: 'boolean' },
-      'include-globs': { type: 'string' },
-      'exclude-globs': { type: 'string' },
+      'include-globs': { type: 'string', multiple: true },
+      'exclude-globs': { type: 'string', multiple: true },
       concurrency: { type: 'string' },
       'no-cache': { type: 'boolean' },
       bytype: { type: 'boolean' },
@@ -61,11 +61,8 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   const path = positionals[0] ?? process.cwd();
   const config = loadConfig(path);
 
-  // Comma-split globs
-  const cliIncludeGlobs =
-    values['include-globs'] !== undefined ? values['include-globs'].split(',') : undefined;
-  const cliExcludeGlobs =
-    values['exclude-globs'] !== undefined ? values['exclude-globs'].split(',') : undefined;
+  const cliIncludeGlobs = values['include-globs']?.flatMap((v) => v.split(','));
+  const cliExcludeGlobs = values['exclude-globs']?.flatMap((v) => v.split(','));
 
   const include: AnalyzeOptions['include'] = {
     whitespace: values['include-whitespace'] ?? config.includeWhitespace ?? false,
