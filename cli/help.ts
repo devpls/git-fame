@@ -1,4 +1,4 @@
-export const HELP_TEXT = `Usage: node-fame [options] [path]
+export const HELP_TEXT = `Usage: git-fame [options] [path]
 
 Fast, accurate git contribution stats — lines, commits, files per author.
 

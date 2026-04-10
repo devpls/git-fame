@@ -50,7 +50,7 @@ const KNOWN_KEYS = new Set<string>([
 ]);
 
 export const loadConfig = (repoPath: string): NodeFameConfig => {
-  const configPath = join(repoPath, '.node-famerc');
+  const configPath = join(repoPath, '.gitfamerc');
 
   if (!existsSync(configPath)) {
     return {};
@@ -61,7 +61,7 @@ export const loadConfig = (repoPath: string): NodeFameConfig => {
     raw = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to parse .node-famerc: ${message}`);
+    throw new Error(`Failed to parse .gitfamerc: ${message}`);
   }
 
   const config: NodeFameConfig = {};

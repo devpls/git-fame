@@ -1,5 +1,5 @@
 {
-  "name": "node-fame",
+  "name": "git-fame",
   "version": "0.1.0",
   "description": "Fast, accurate git contribution stats — lines, commits, files per author.",
   "license": "MIT",

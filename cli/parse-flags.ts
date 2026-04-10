@@ -138,7 +138,7 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
 
   // Breakdown: --bytype / --bydir
   if (values.bytype === true && values.bydir !== undefined) {
-    process.stderr.write('node-fame: --bytype and --bydir are mutually exclusive\n');
+    process.stderr.write('git-fame: --bytype and --bydir are mutually exclusive\n');
     process.exit(1);
   }
   if (values.bytype === true) {
@@ -146,7 +146,7 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   } else if (values.bydir !== undefined) {
     const depth = parseInt(values.bydir, 10);
     if (isNaN(depth) || depth < 1) {
-      process.stderr.write('node-fame: --bydir requires a positive integer depth\n');
+      process.stderr.write('git-fame: --bydir requires a positive integer depth\n');
       process.exit(1);
     }
     analyzeOptions.groupBy = { type: 'directory', depth };

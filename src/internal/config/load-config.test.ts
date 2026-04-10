@@ -14,7 +14,7 @@ describe('loadConfig', () => {
     }
   });
 
-  it('returns empty object when .node-famerc does not exist', () => {
+  it('returns empty object when .gitfamerc does not exist', () => {
     const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
     dirs.push(dir);
     expect(loadConfig(dir)).toEqual({});
@@ -24,7 +24,7 @@ describe('loadConfig', () => {
     const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
     dirs.push(dir);
     writeFileSync(
-      join(dir, '.node-famerc'),
+      join(dir, '.gitfamerc'),
       JSON.stringify({
         format: 'json',
         sort: 'commits',
@@ -46,15 +46,15 @@ describe('loadConfig', () => {
   it('throws on malformed JSON with descriptive message', () => {
     const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
     dirs.push(dir);
-    writeFileSync(join(dir, '.node-famerc'), '{bad json', 'utf8');
-    expect(() => loadConfig(dir)).toThrow('Failed to parse .node-famerc');
+    writeFileSync(join(dir, '.gitfamerc'), '{bad json', 'utf8');
+    expect(() => loadConfig(dir)).toThrow('Failed to parse .gitfamerc');
   });
 
   it('ignores unknown fields', () => {
     const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
     dirs.push(dir);
     writeFileSync(
-      join(dir, '.node-famerc'),
+      join(dir, '.gitfamerc'),
       JSON.stringify({
         format: 'csv',
         unknownField: 42,
@@ -72,7 +72,7 @@ describe('loadConfig', () => {
   it('returns empty object for empty JSON object', () => {
     const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
     dirs.push(dir);
-    writeFileSync(join(dir, '.node-famerc'), '{}', 'utf8');
+    writeFileSync(join(dir, '.gitfamerc'), '{}', 'utf8');
     expect(loadConfig(dir)).toEqual({});
   });
 });

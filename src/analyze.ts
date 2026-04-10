@@ -71,7 +71,7 @@ export const analyze = async (options: AnalyzeOptions): Promise<Report> => {
 
     if (gitDirResult.status === 0 && isWorktreeClean(options.path)) {
       const gitDir = join(options.path, gitDirResult.stdout.trim());
-      const cacheDir = join(gitDir, 'node-fame-cache');
+      const cacheDir = join(gitDir, 'git-fame-cache');
 
       const mailmapPath = join(options.path, '.mailmap');
       const gitattrsPath = join(options.path, '.gitattributes');

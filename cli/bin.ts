@@ -79,6 +79,6 @@ const main = async (): Promise<void> => {
 
 main().catch((err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`node-fame: ${message}\n`);
+  process.stderr.write(`git-fame: ${message}\n`);
   process.exit(1);
 });

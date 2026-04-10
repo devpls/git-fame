@@ -142,11 +142,11 @@ describe('parseFlags', () => {
       }
     });
 
-    it('loads .node-famerc config values', () => {
+    it('loads .gitfamerc config values', () => {
       const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
       created.push(dir);
       writeFileSync(
-        join(dir, '.node-famerc'),
+        join(dir, '.gitfamerc'),
         JSON.stringify({ format: 'json', includeGlobs: ['**/*.ts'], concurrency: 4 }),
         'utf8',
       );
@@ -157,11 +157,11 @@ describe('parseFlags', () => {
       expect(result.options.concurrency).toBe(4);
     });
 
-    it('CLI flags override .node-famerc', () => {
+    it('CLI flags override .gitfamerc', () => {
       const dir = mkdtempSync(join(tmpdir(), `cfg-${randomUUID()}-`));
       created.push(dir);
       writeFileSync(
-        join(dir, '.node-famerc'),
+        join(dir, '.gitfamerc'),
         JSON.stringify({ format: 'json', concurrency: 4 }),
         'utf8',
       );
