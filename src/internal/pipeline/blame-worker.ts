@@ -3,27 +3,27 @@ import { computeGroupKey } from './compute-group-key.js';
 import { countBlameLines } from './count-blame-lines.js';
 import type { Aggregator } from '../identity/aggregator/index.js';
 
-const SEPARATOR = '__BLAME_END__';
-
 interface BlameWorkerOptions {
   rev: string;
   followRenames: boolean;
   ignoreWhitespace: boolean;
 }
 
-const buildBlameCommand = (
+const buildBlameArgs = (
   rev: string,
   followRenames: boolean,
   ignoreWhitespace: boolean,
-): string => {
-  const parts = ['git blame --porcelain', rev];
+  file: string,
+): string[] => {
+  const args = ['blame', '--porcelain', rev];
   if (followRenames) {
-    parts.push('-M -C');
+    args.push('-M', '-C');
   }
   if (ignoreWhitespace) {
-    parts.push('-w');
+    args.push('-w');
   }
-  return parts.join(' ');
+  args.push('--', file);
+  return args;
 };
 
 export interface BlameWorker {
@@ -37,91 +37,77 @@ export const createBlameWorker = (
   options: BlameWorkerOptions,
   groupBy?: { type: 'extension' | 'directory'; depth: number },
 ): BlameWorker => {
-  const blameCmd = buildBlameCommand(options.rev, options.followRenames, options.ignoreWhitespace);
-
-  const child = spawn(
-    'sh',
-    [
-      '-c',
-      `while IFS= read -r file; do ${blameCmd} -- "$file" 2>/dev/null; echo "${SEPARATOR}"; done`,
-    ],
-    { cwd, stdio: ['pipe', 'pipe', 'ignore'] },
-  );
-
-  let buffer = '';
-  let currentFile = '';
-  let resolver: (() => void) | null = null;
-
-  child.stdout.on('data', (chunk: Buffer) => {
-    buffer += chunk.toString();
-
-    let sepIdx: number;
-    while ((sepIdx = buffer.indexOf(SEPARATOR + '\n')) !== -1) {
-      const blameOutput = buffer.slice(0, sepIdx);
-      buffer = buffer.slice(sepIdx + SEPARATOR.length + 1);
-
-      if (blameOutput.length === 0) {
-        aggregator.recordWarning({
-          code: 'BLAME_FAILED',
-          file: currentFile,
-          error: 'empty output',
-          message: `git blame produced no output for ${currentFile}`,
-        });
-      } else {
-        try {
-          const gk = groupBy !== undefined ? computeGroupKey(currentFile, groupBy) : undefined;
-          countBlameLines(blameOutput, aggregator, gk);
-          if (gk !== undefined) {
-            aggregator.recordFileGroup(gk, currentFile);
-          }
-        } catch {
-          aggregator.recordWarning({
-            code: 'BLAME_FAILED',
-            file: currentFile,
-            error: 'parse error',
-            message: `Failed to parse blame output for ${currentFile}`,
-          });
-        }
-      }
-
-      if (resolver !== null) {
-        const r = resolver;
-        resolver = null;
-        r();
-      }
-    }
-  });
-
-  child.on('error', (err) => {
-    if (resolver !== null) {
-      resolver();
-      resolver = null;
-    }
-    aggregator.recordWarning({
-      code: 'BLAME_FAILED',
-      file: currentFile,
-      error: err.message,
-      message: `Blame worker error: ${err.message}`,
-    });
-  });
-
-  child.on('close', () => {
-    if (resolver !== null) {
-      resolver();
-      resolver = null;
-    }
-  });
-
   return {
     blame(file: string): Promise<void> {
       return new Promise((resolve) => {
-        currentFile = file;
-        resolver = resolve;
-        child.stdin.write(file + '\n');
+        const args = buildBlameArgs(
+          options.rev,
+          options.followRenames,
+          options.ignoreWhitespace,
+          file,
+        );
+        const child = spawn('git', args, {
+          cwd,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+
+        const chunks: Buffer[] = [];
+        let settled = false;
+
+        child.stdout.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+
+        child.on('error', (err) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          aggregator.recordWarning({
+            code: 'BLAME_FAILED',
+            file,
+            error: err.message,
+            message: `Blame worker error: ${err.message}`,
+          });
+          resolve();
+        });
+
+        child.on('close', () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          const output = Buffer.concat(chunks).toString('utf8');
+          if (output.length === 0) {
+            aggregator.recordWarning({
+              code: 'BLAME_FAILED',
+              file,
+              error: 'empty output',
+              message: `git blame produced no output for ${file}`,
+            });
+            resolve();
+            return;
+          }
+          try {
+            const gk = groupBy !== undefined ? computeGroupKey(file, groupBy) : undefined;
+            countBlameLines(output, aggregator, gk);
+            if (gk !== undefined) {
+              aggregator.recordFileGroup(gk, file);
+            }
+          } catch {
+            aggregator.recordWarning({
+              code: 'BLAME_FAILED',
+              file,
+              error: 'parse error',
+              message: `Failed to parse blame output for ${file}`,
+            });
+          }
+          resolve();
+        });
       });
     },
     close(): void {
-      child.stdin.end();
+      // Nothing to clean up — each blame spawns its own short-lived git process.
     },
   };
 };
