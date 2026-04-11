@@ -32,8 +32,12 @@ export const analyzeMany = async (options: AnalyzeManyOptions): Promise<Report[]
   }
 
   if (options.recursive === true) {
-    const entries = readdirSync(options.path, { withFileTypes: true });
+    const base = toAnalyzeOptions(options);
     const reports: Report[] = [];
+    if (isGitRepo(options.path)) {
+      reports.push(await analyze(base));
+    }
+    const entries = readdirSync(options.path, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) {
         continue;
@@ -42,8 +46,7 @@ export const analyzeMany = async (options: AnalyzeManyOptions): Promise<Report[]
       if (!isGitRepo(subDir)) {
         continue;
       }
-      const report = await analyze({ ...toAnalyzeOptions(options), path: subDir });
-      reports.push(report);
+      reports.push(await analyze({ ...base, path: subDir }));
     }
     return reports;
   }
