@@ -1,27 +1,18 @@
 name: CI
 
 on:
-  push:
-    branches: [main, feat/initial]
   pull_request:
     branches: [main]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        node-version: [20, 22]
-        os: [ubuntu-latest, macos-latest]
-
+  ci:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -32,6 +23,9 @@ jobs:
 
       - name: Test
         run: npm run test:run
+
+      - name: Coverage
+        run: npm run coverage
 
       - name: Build
         run: npm run build
