@@ -4,6 +4,23 @@
   "description": "Fast, accurate git contribution stats — lines, commits, files per author.",
   "license": "MIT",
   "author": "Mykhailo Kalashnikov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devpls/git-fame.git"
+  },
+  "homepage": "https://github.com/devpls/git-fame#readme",
+  "bugs": {
+    "url": "https://github.com/devpls/git-fame/issues"
+  },
+  "keywords": [
+    "git",
+    "blame",
+    "stats",
+    "contributions",
+    "authors",
+    "git-fame",
+    "cli"
+  ],
   "type": "module",
   "engines": {
     "node": ">=20"
