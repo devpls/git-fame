@@ -35,6 +35,18 @@ describe('analyzeMany', () => {
     expect(subReport?.authors.some((a) => a.email === 'lib@example.com')).toBe(true);
   });
 
+  it('includes the root path in recursive mode when it is itself a git repo', async () => {
+    const dir = buildRepo([
+      { author: 'Root <root@x>', date: '2024-01-01T00:00:00Z', files: { 'a.txt': 'x\n' } },
+    ]);
+    createdRepos.push(dir);
+
+    const reports = await analyzeMany({ path: dir, recursive: true });
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.repo.path).toBe(dir);
+    expect(reports[0]?.authors.some((a) => a.email === 'root@x')).toBe(true);
+  });
+
   it('analyzes sibling repos in recursive mode', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'node-fame-recursive-'));
     createdRepos.push(workspace);
