@@ -1,3 +1,9 @@
+## [0.2.2](https://github.com/devpls/git-fame/compare/v0.2.1...v0.2.2) (2026-04-11)
+
+### Bug Fixes
+
+- spawn git blame directly to fix Windows hang ([78b6741](https://github.com/devpls/git-fame/commit/78b67410416bd2ccc1f73eb457fed940ee03dfbd))
+
 # [0.2.0](https://github.com/devpls/git-fame/compare/v0.1.0...v0.2.0) (2026-04-10)
 
 ### Bug Fixes

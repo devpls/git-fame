@@ -1,6 +1,6 @@
 {
   "name": "git-fame",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Fast, accurate git contribution stats — lines, commits, files per author.",
   "license": "MIT",
   "author": "Mykhailo Kalashnikov",
