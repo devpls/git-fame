@@ -1,3 +1,9 @@
+## [0.2.4](https://github.com/devpls/git-fame/compare/v0.2.3...v0.2.4) (2026-04-12)
+
+### Bug Fixes
+
+- trim whitespace from comma-separated glob patterns ([86887ad](https://github.com/devpls/git-fame/commit/86887ad08d8b8190e2cc7588b3551e4a2d3d4d36))
+
 ## [0.2.3](https://github.com/devpls/git-fame/compare/v0.2.2...v0.2.3) (2026-04-12)
 
 ### Bug Fixes
