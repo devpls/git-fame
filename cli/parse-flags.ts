@@ -1,8 +1,29 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import type { AnalyzeOptions } from '../src/types/analyze-options.type.js';
 import type { RenderOptions, SortableColumn } from '../src/render/index.js';
 import { loadConfig } from '../src/internal/config/load-config.js';
 import { HELP_TEXT } from './help.js';
+
+const findPackageJson = (): string => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (;;) {
+    const candidate = resolve(dir, 'package.json');
+    try {
+      return readFileSync(candidate, 'utf8');
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) {
+        throw new Error('Could not find package.json');
+      }
+      dir = parent;
+    }
+  }
+};
+
+const { version } = JSON.parse(findPackageJson()) as { version: string };
 
 export interface ParsedFlags {
   options: AnalyzeOptions;
@@ -18,7 +39,7 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
     args: argv.slice(2),
     options: {
       help: { type: 'boolean', short: 'h' },
-      version: { type: 'boolean', short: 'V' },
+      version: { type: 'boolean', short: 'v' },
       format: { type: 'string' },
       sort: { type: 'string' },
       limit: { type: 'string' },
@@ -54,7 +75,7 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   }
 
   if (values.version === true) {
-    process.stdout.write('0.1.0\n');
+    process.stdout.write(`${version}\n`);
     process.exit(0);
   }
 
