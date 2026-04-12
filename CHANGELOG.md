@@ -1,3 +1,10 @@
+## [0.2.3](https://github.com/devpls/git-fame/compare/v0.2.2...v0.2.3) (2026-04-12)
+
+### Bug Fixes
+
+- include root path in recursive mode when it is a git repo ([ffabc48](https://github.com/devpls/git-fame/commit/ffabc485fe82d5a97e16aeed40964ac374825659))
+- read version from package.json and use lowercase -v flag ([db3243e](https://github.com/devpls/git-fame/commit/db3243e6739bc47495ac5c8c432b71fcc91bb8de))
+
 ## [0.2.2](https://github.com/devpls/git-fame/compare/v0.2.1...v0.2.2) (2026-04-11)
 
 ### Bug Fixes
