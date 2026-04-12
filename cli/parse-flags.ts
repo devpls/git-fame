@@ -82,8 +82,12 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   const path = positionals[0] ?? process.cwd();
   const config = loadConfig(path);
 
-  const cliIncludeGlobs = values['include-globs']?.flatMap((v) => v.split(','));
-  const cliExcludeGlobs = values['exclude-globs']?.flatMap((v) => v.split(','));
+  const cliIncludeGlobs = values['include-globs']?.flatMap((v) =>
+    v.split(',').map((g) => g.trim()),
+  );
+  const cliExcludeGlobs = values['exclude-globs']?.flatMap((v) =>
+    v.split(',').map((g) => g.trim()),
+  );
 
   const include: AnalyzeOptions['include'] = {
     whitespace: values['include-whitespace'] ?? config.includeWhitespace ?? false,
