@@ -38,7 +38,7 @@ npm install git-fame       # library dependency
 Usage: git-fame [options] [path]
 
 Options:
-  -V, --version                  Output the version number
+  -v, --version                  Output the version number
   --format <format>              Output format: table, json, csv, markdown (default: table)
   --sort <column>                Sort by: linesAlive, linesAdded, linesDeleted, commits, files
   --limit <n>                    Show only top N authors
