@@ -11,6 +11,8 @@ npx git-fame .
 npx git-fame /path/to/repo
 npx git-fame --format json .
 npx git-fame --bytype .
+npx git-fame --recursive --summary ~/work
+npx git-fame -o report.json .
 ```
 
 ## Installation
@@ -30,6 +32,8 @@ npm install git-fame       # library dependency
 - **Config file**: `.gitfamerc` pins flags per repo
 - **Multi-repo**: `--recursive` scans all repos in a directory
 - **Output formats**: table, JSON, CSV, Markdown
+- **File output**: `--output report.json` or `--output dir/` for per-repo files
+- **Summary**: `--summary` aggregates stats across repos in recursive mode
 - **Library + CLI**: use as `npx git-fame` or `import { analyze } from 'git-fame'`
 
 ## CLI
@@ -63,6 +67,8 @@ Options:
   --submodules                   Walk into submodules
   --split-submodules             Separate reports per submodule
   --recursive                    Analyze all repos in subdirectories
+  -o, --output <path>            Save output to file or directory
+  -S, --summary                  Aggregate summary across repos (with --recursive)
   -h, --help                     Display help
 ```
 
@@ -103,6 +109,27 @@ $ git-fame --include-globs '*.ts,*.tsx' .
 
 ```bash
 $ git-fame --recursive ~/work --limit 10
+```
+
+**Save to file (format inferred from extension):**
+
+```bash
+$ git-fame -o report.json .
+$ git-fame -o report.csv .
+$ git-fame -o report.md .
+```
+
+**Directory output (one file per repo):**
+
+```bash
+$ git-fame --recursive --format json -o ./reports/ ~/work
+```
+
+**Cross-repo summary:**
+
+```bash
+$ git-fame --recursive --summary ~/work
+$ git-fame --recursive --summary --format json -o summary.json ~/work
 ```
 
 ## Config file
@@ -149,6 +176,16 @@ console.log(JSON.stringify(report, null, 2));
 import { analyzeMany } from 'git-fame';
 
 const reports = await analyzeMany({ path: '/workspace', recursive: true });
+```
+
+**Cross-repo summary:**
+
+```ts
+import { analyzeMany, summarize, render } from 'git-fame';
+
+const reports = await analyzeMany({ path: '/workspace', recursive: true });
+const summary = summarize(reports);
+console.log(render(summary, 'table'));
 ```
 
 ## Performance
