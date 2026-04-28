@@ -105,4 +105,31 @@ describe('prepareAuthors', () => {
     expect(result[0]?.name).toBe('Bob');
     expect(result[1]?.name).toBe('Alice');
   });
+
+  it('preserves breakdown when present on source author', () => {
+    const breakdown = { ts: 40, js: 10 };
+    const report = makeReport({
+      authors: [
+        {
+          name: 'Alice',
+          email: 'alice@example.com',
+          linesAlive: 75,
+          linesAdded: 80,
+          linesDeleted: 5,
+          commits: 1,
+          files: 3,
+          firstCommit: new Date('2024-01-01T00:00:00Z'),
+          lastCommit: new Date('2024-01-02T00:00:00Z'),
+          breakdown,
+        },
+      ],
+    });
+    const result = prepareAuthors(report);
+    expect(result[0]?.breakdown).toEqual(breakdown);
+  });
+
+  it('omits breakdown when not present on source author', () => {
+    const result = prepareAuthors(makeReport());
+    expect(result[0]?.breakdown).toBeUndefined();
+  });
 });

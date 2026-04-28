@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import { analyze } from './analyze.js';
 import { ConflictingOptionsError } from './errors/conflicting-options.error.js';
+import { version } from './version.js';
 import { buildRepo } from '../tests/helpers/build-repo.js';
 import { buildRepoWithSubmodule } from '../tests/helpers/build-repo-with-submodule.js';
 
@@ -34,7 +35,7 @@ describe('analyze', () => {
 
     const report = await analyze({ path: dir });
 
-    expect(report.meta.version).toBe('0.1.0');
+    expect(report.meta.version).toBe(version);
     expect(report.repo.path).toBe(dir);
     expect(report.repo.headSha).toMatch(/^[0-9a-f]{40}$/);
     expect(report.authors).toHaveLength(2);

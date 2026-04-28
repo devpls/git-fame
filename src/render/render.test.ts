@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { Report } from '../types/report.type.js';
+import type { Summary } from '../types/summary.type.js';
 import { render } from './render.js';
+
+const makeSummary = (): Summary => ({
+  meta: {
+    version: '0.1.0',
+    generatedAt: new Date(0),
+    repoCount: 2,
+  },
+  repos: [
+    { path: '/tmp/repo-a', headSha: 'a'.repeat(40), headRef: 'HEAD' },
+    { path: '/tmp/repo-b', headSha: 'b'.repeat(40), headRef: 'HEAD' },
+  ],
+  totals: { linesAlive: 0, linesAdded: 0, linesDeleted: 0, commits: 0, files: 0 },
+  authors: [],
+  warnings: [],
+});
 
 const emptyReport = (): Report => ({
   meta: {
@@ -78,5 +94,32 @@ describe('render', () => {
     const out = render(report, 'json', { limit: 1 });
     const parsed = JSON.parse(out) as { authors: unknown[] };
     expect(parsed.authors).toHaveLength(1);
+  });
+});
+
+describe('render — Summary dispatch', () => {
+  it('delegates "table" format to renderSummaryTable', () => {
+    const out = render(makeSummary(), 'table');
+    expect(out).toContain('Summary');
+  });
+
+  it('delegates "json" format to renderSummaryJson', () => {
+    const out = render(makeSummary(), 'json');
+    expect(() => JSON.parse(out) as unknown).not.toThrow();
+  });
+
+  it('delegates "csv" format to renderSummaryCsv', () => {
+    const out = render(makeSummary(), 'csv');
+    expect(out).toContain('section,author');
+  });
+
+  it('delegates "markdown" format to renderSummaryMarkdown', () => {
+    const out = render(makeSummary(), 'markdown');
+    expect(out).toContain('## Summary');
+  });
+
+  it('throws for an unknown format when given a Summary', () => {
+    // @ts-expect-error — deliberately passing an invalid format to test runtime guard
+    expect(() => render(makeSummary(), 'yaml')).toThrow(/unsupported format/i);
   });
 });

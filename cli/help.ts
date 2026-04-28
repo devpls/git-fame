@@ -31,5 +31,7 @@ Options:
   --submodules                   Walk into submodules
   --split-submodules             Separate reports per submodule
   --recursive                    Analyze all repos in subdirectories
+  -o, --output <path>            Write output to file or directory
+  -S, --summary                  Show cross-repo summary (requires --recursive or --split-submodules)
   -h, --help                     Display help
 `;
