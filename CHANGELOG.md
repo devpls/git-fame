@@ -1,3 +1,9 @@
+# [0.3.0](https://github.com/devpls/git-fame/compare/v0.2.4...v0.3.0) (2026-04-28)
+
+### Features
+
+- add --output and --summary CLI flags with file/directory output and cross-repo aggregation ([3048ee5](https://github.com/devpls/git-fame/commit/3048ee55b8e8f69f1223b9b2e87bdc3272a234fa))
+
 ## [0.2.4](https://github.com/devpls/git-fame/compare/v0.2.3...v0.2.4) (2026-04-12)
 
 ### Bug Fixes
