@@ -1,4 +1,5 @@
 import type { Report } from '../types/report.type.js';
+import type { Summary } from '../types/summary.type.js';
 import type { RenderOptions } from './types/render-options.type.js';
 import { renderTable } from './table/index.js';
 import { renderJson } from './json/index.js';
@@ -10,16 +11,35 @@ import {
   renderBreakdownCsv,
   renderBreakdownMarkdown,
 } from './breakdown/index.js';
+import {
+  renderSummaryTable,
+  renderSummaryJson,
+  renderSummaryCsv,
+  renderSummaryMarkdown,
+} from './summary/index.js';
 
 export type RenderFormat = 'table' | 'json' | 'csv' | 'markdown';
 
-export const render = (report: Report, format: RenderFormat, options?: RenderOptions): string => {
+const isSummary = (data: Report | Summary): data is Summary => 'repos' in data;
+
+export const render = (
+  data: Report | Summary,
+  format: RenderFormat,
+  options?: RenderOptions,
+): string => {
   // use string comparison to avoid no-unnecessary-condition with narrow union
   const f: string = format;
-  if (f === 'table') return renderTable(report, options);
-  if (f === 'json') return renderJson(report, options);
-  if (f === 'csv') return renderCsv(report, options);
-  if (f === 'markdown') return renderMarkdown(report, options);
+  if (isSummary(data)) {
+    if (f === 'table') return renderSummaryTable(data, options);
+    if (f === 'json') return renderSummaryJson(data, options);
+    if (f === 'csv') return renderSummaryCsv(data, options);
+    if (f === 'markdown') return renderSummaryMarkdown(data, options);
+    throw new Error(`render: unsupported format '${f}'`);
+  }
+  if (f === 'table') return renderTable(data, options);
+  if (f === 'json') return renderJson(data, options);
+  if (f === 'csv') return renderCsv(data, options);
+  if (f === 'markdown') return renderMarkdown(data, options);
   throw new Error(`render: unsupported format '${f}'`);
 };
 

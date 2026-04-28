@@ -1,6 +1,10 @@
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { Aggregator } from '../identity/aggregator/index.js';
 import { assembleReport } from './assemble-report.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../../../package.json') as { version: string };
 
 describe('assembleReport', () => {
   it('builds a report from an aggregator with the supplied meta and repo fields', () => {
@@ -14,7 +18,7 @@ describe('assembleReport', () => {
       durationMs: 123,
     });
 
-    expect(report.meta.version).toBe('0.1.0');
+    expect(report.meta.version).toBe(pkg.version);
     expect(report.meta.generatedAt).toEqual(start);
     expect(report.meta.durationMs).toBe(123);
     expect(report.repo.path).toBe('/tmp/repo');
