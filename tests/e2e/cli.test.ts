@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { buildRepo } from '../helpers/build-repo.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -30,16 +30,6 @@ const run = (args: string[], cwd?: string): RunResult => {
 
 describe('CLI e2e', () => {
   const createdDirs: string[] = [];
-
-  beforeAll(() => {
-    const build = spawnSync('npm', ['run', 'build'], {
-      cwd: join(__dirname, '../..'),
-      encoding: 'utf8',
-    });
-    if (build.status !== 0) {
-      throw new Error(`npm run build failed:\n${build.stderr}`);
-    }
-  });
 
   afterAll(() => {
     while (createdDirs.length > 0) {

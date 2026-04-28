@@ -1,8 +1,8 @@
-import type { AuthorStats } from '../../types/author-stats.type.js';
-import type { Report } from '../../types/report.type.js';
+import type { Summary } from '../../types/summary.type.js';
+import type { SummaryAuthor } from '../../types/summary-author.type.js';
 import type { RenderOptions, SortableColumn } from '../types/render-options.type.js';
 
-export interface PreparedAuthor {
+export interface PreparedSummaryAuthor {
   name: string;
   email: string;
   linesAlive: number;
@@ -13,6 +13,7 @@ export interface PreparedAuthor {
   files: number;
   percentAlive: string;
   breakdown?: Record<string, number>;
+  perRepo: SummaryAuthor['perRepo'];
 }
 
 const formatPercent = (value: number, total: number): string => {
@@ -20,17 +21,19 @@ const formatPercent = (value: number, total: number): string => {
   return ((value / total) * 100).toFixed(1);
 };
 
-const getSortValue = (author: AuthorStats, by: SortableColumn): number => {
+const getSortValue = (author: SummaryAuthor, by: SortableColumn): number => {
   if (by === 'lastCommit') return author.lastCommit.getTime();
   return author[by];
 };
 
-export const prepareAuthors = (report: Report, options?: RenderOptions): PreparedAuthor[] => {
+export const prepareSummaryAuthors = (
+  summary: Summary,
+  options?: RenderOptions,
+): PreparedSummaryAuthor[] => {
   const sortBy = options?.sort?.by ?? 'linesAlive';
   const sortOrder = options?.sort?.order ?? 'desc';
-  const totalAlive = report.authors.reduce((sum, a) => sum + a.linesAlive, 0);
 
-  const sorted = [...report.authors].sort((a, b) => {
+  const sorted = [...summary.authors].sort((a, b) => {
     const aVal = getSortValue(a, sortBy);
     const bVal = getSortValue(b, sortBy);
     return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
@@ -47,7 +50,8 @@ export const prepareAuthors = (report: Report, options?: RenderOptions): Prepare
     linesNet: author.linesAdded - author.linesDeleted,
     commits: author.commits,
     files: author.files,
-    percentAlive: formatPercent(author.linesAlive, totalAlive),
+    percentAlive: formatPercent(author.linesAlive, summary.totals.linesAlive),
     ...(author.breakdown !== undefined ? { breakdown: author.breakdown } : {}),
+    perRepo: author.perRepo,
   }));
 };

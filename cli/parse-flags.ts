@@ -1,37 +1,22 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import type { AnalyzeOptions } from '../src/types/analyze-options.type.js';
 import type { RenderOptions, SortableColumn } from '../src/render/index.js';
 import { loadConfig } from '../src/internal/config/load-config.js';
+import { version } from '../src/version.js';
 import { HELP_TEXT } from './help.js';
-
-const findPackageJson = (): string => {
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (;;) {
-    const candidate = resolve(dir, 'package.json');
-    try {
-      return readFileSync(candidate, 'utf8');
-    } catch {
-      const parent = dirname(dir);
-      if (parent === dir) {
-        throw new Error('Could not find package.json');
-      }
-      dir = parent;
-    }
-  }
-};
-
-const { version } = JSON.parse(findPackageJson()) as { version: string };
+import { resolveFormat } from './helpers/resolve-format.js';
+import type { FormatSource } from './helpers/resolve-format.js';
 
 export interface ParsedFlags {
   options: AnalyzeOptions;
   format: string;
+  formatSource: FormatSource;
   renderOptions: RenderOptions;
   recursive: boolean;
   splitSubmodules: boolean;
   perAuthor: boolean;
+  output: string | undefined;
+  summary: boolean;
 }
 
 export const parseFlags = (argv: string[]): ParsedFlags => {
@@ -64,6 +49,8 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
       submodules: { type: 'boolean' },
       'split-submodules': { type: 'boolean' },
       recursive: { type: 'boolean' },
+      output: { type: 'string', short: 'o' },
+      summary: { type: 'boolean', short: 'S', default: false },
     },
     allowPositionals: true,
     strict: true,
@@ -177,7 +164,14 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
     analyzeOptions.groupBy = { type: 'directory', depth };
   }
 
-  const format = values.format ?? config.format ?? 'table';
+  const summary = values.summary;
+  if (summary && !recursive && !splitSubmodules) {
+    process.stderr.write('git-fame: --summary requires --recursive or --split-submodules\n');
+    process.exit(1);
+  }
+
+  const resolved = resolveFormat(values.format, values.output, config.format);
+  const format = resolved.format;
   const sort = values.sort ?? config.sort ?? 'linesAlive';
   const cliLimit = values.limit !== undefined ? parseInt(values.limit, 10) : undefined;
   const limit = cliLimit ?? config.limit;
@@ -185,6 +179,7 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
   return {
     options: analyzeOptions,
     format,
+    formatSource: resolved.source,
     renderOptions: {
       sort: { by: sort as SortableColumn, order: 'desc' as const },
       ...(limit !== undefined && !isNaN(limit) ? { limit } : {}),
@@ -192,5 +187,7 @@ export const parseFlags = (argv: string[]): ParsedFlags => {
     recursive,
     splitSubmodules,
     perAuthor: values['per-author'] ?? false,
+    output: values.output,
+    summary,
   };
 };

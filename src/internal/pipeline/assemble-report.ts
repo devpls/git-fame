@@ -1,7 +1,6 @@
 import type { Aggregator } from '../identity/aggregator/index.js';
 import type { Report } from '../../types/report.type.js';
-
-const NODE_FAME_VERSION = '0.1.0';
+import { version as NODE_FAME_VERSION } from '../../version.js';
 
 export interface AssembleContext {
   path: string;
